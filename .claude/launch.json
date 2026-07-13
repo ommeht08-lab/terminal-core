@@ -1,0 +1,28 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "backend",
+      "runtimeExecutable": "/Users/om/Documents/Quant Finance Model/backend/venv/bin/uvicorn",
+      "runtimeArgs": [
+        "main:app",
+        "--port",
+        "8000",
+        "--app-dir",
+        "/Users/om/Documents/Quant Finance Model/backend"
+      ],
+      "port": 8000
+    },
+    {
+      "name": "frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "/Users/om/Documents/Quant Finance Model/frontend"
+      ],
+      "port": 3000
+    }
+  ]
+}
