@@ -1,10 +1,14 @@
 import pandas as pd
 import yfinance as yf
 
+from yf_session import YF_SESSION
+
 
 def fetch_ohlcv(ticker: str) -> pd.DataFrame:
     """Fetch 5 years of daily OHLCV data for a ticker and return a cleaned DataFrame."""
-    df = yf.Ticker(ticker).history(period="5y", interval="1d", auto_adjust=False)
+    df = yf.Ticker(ticker, session=YF_SESSION).history(
+        period="5y", interval="1d", auto_adjust=False
+    )
 
     if df.empty:
         raise ValueError(f"No data returned for ticker '{ticker}'")
@@ -35,6 +39,7 @@ def fetch_batch_quotes(tickers: list[str]) -> dict[str, dict]:
         threads=True,
         progress=False,
         auto_adjust=False,
+        session=YF_SESSION,
     )
 
     quotes: dict[str, dict] = {}

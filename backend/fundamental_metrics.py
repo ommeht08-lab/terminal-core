@@ -1,5 +1,7 @@
 import yfinance as yf
 
+from yf_session import YF_SESSION
+
 
 def _score_higher_better(value, thresholds):
     """thresholds: list of (min_exclusive_bound, points) ordered highest bound first."""
@@ -22,7 +24,7 @@ def _score_lower_better(value, thresholds):
 
 
 def calculate_fundamentals(ticker: str) -> dict:
-    info = yf.Ticker(ticker).info
+    info = yf.Ticker(ticker, session=YF_SESSION).info
 
     revenue_growth_score = _score_higher_better(
         info.get("revenueGrowth"), [(0.15, 12.5), (0.05, 8), (0, 4)]

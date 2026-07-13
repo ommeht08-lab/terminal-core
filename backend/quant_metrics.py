@@ -3,6 +3,8 @@ from datetime import datetime
 import pandas as pd
 import yfinance as yf
 
+from yf_session import YF_SESSION
+
 
 def calculate_rsi(close: pd.Series, period: int = 14) -> pd.Series:
     """Standard Wilder's RSI: exponential smoothing of average gains/losses over `period`."""
@@ -84,7 +86,7 @@ def build_sparkline(metrics_df: pd.DataFrame, days: int = 30) -> list[float]:
 def get_fundamental_snapshot(ticker: str) -> dict:
     """Fetch trailing/forward P/E, price-to-book, ROE, and operating margin via yfinance .info."""
     try:
-        info = yf.Ticker(ticker).info
+        info = yf.Ticker(ticker, session=YF_SESSION).info
     except Exception:
         info = {}
 
@@ -104,7 +106,7 @@ def get_news(ticker: str, limit: int = 5) -> list[dict]:
     canonicalUrl.url, pubDate as an ISO 8601 string) rather than flat top-level keys.
     """
     try:
-        raw_news = yf.Ticker(ticker).news or []
+        raw_news = yf.Ticker(ticker, session=YF_SESSION).news or []
     except Exception:
         return []
 
