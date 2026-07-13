@@ -1,9 +1,8 @@
 from datetime import datetime
 
 import pandas as pd
-import yfinance as yf
 
-from yf_session import YF_SESSION
+from fmp_client import fmp_get, fmp_get_first
 
 
 def calculate_rsi(close: pd.Series, period: int = 14) -> pd.Series:
@@ -84,51 +83,51 @@ def build_sparkline(metrics_df: pd.DataFrame, days: int = 30) -> list[float]:
 
 
 def get_fundamental_snapshot(ticker: str) -> dict:
-    """Fetch trailing/forward P/E, price-to-book, ROE, and operating margin via yfinance .info."""
-    try:
-        info = yf.Ticker(ticker, session=YF_SESSION).info
-    except Exception:
-        info = {}
+    """Fetch trailing/forward P/E, price-to-book, ROE, and operating margin via FMP.
+
+    forward_pe has no accessible equivalent on this FMP plan (no forward-estimate
+    endpoint reachable with this key) -- verified empirically, not assumed -- so it
+    is always None here; the frontend already renders null as "N/A".
+    """
+    ratios = fmp_get_first("ratios-ttm", ticker)
+    key_metrics = fmp_get_first("key-metrics-ttm", ticker)
 
     return {
-        "trailing_pe": _safe_float(info.get("trailingPE")),
-        "forward_pe": _safe_float(info.get("forwardPE")),
-        "price_to_book": _safe_float(info.get("priceToBook")),
-        "roe": _safe_float(info.get("returnOnEquity")),
-        "operating_margin": _safe_float(info.get("operatingMargins")),
+        "trailing_pe": _safe_float(ratios.get("priceToEarningsRatioTTM")),
+        "forward_pe": None,
+        "price_to_book": _safe_float(ratios.get("priceToBookRatioTTM")),
+        "roe": _safe_float(key_metrics.get("returnOnEquityTTM")),
+        "operating_margin": _safe_float(ratios.get("operatingProfitMarginTTM")),
     }
 
 
 def get_news(ticker: str, limit: int = 5) -> list[dict]:
-    """Fetch the most recent news headlines for a ticker via yfinance.
+    """Fetch recent news headlines for a ticker via FMP.
 
-    yfinance nests article fields under a "content" dict (title, provider.displayName,
-    canonicalUrl.url, pubDate as an ISO 8601 string) rather than flat top-level keys.
+    FMP's news endpoint (/stable/news/stock) returns HTTP 402 "Restricted
+    Endpoint" on the free tier this key is on -- confirmed against the live API,
+    not assumed -- so fmp_get() returns [] and this degrades to no articles
+    rather than erroring. The field-mapping below (title/publishedDate/site/url)
+    follows FMP's documented shape for when the endpoint becomes reachable, but
+    could not be verified against a real response since the plan blocks it.
     """
-    try:
-        raw_news = yf.Ticker(ticker, session=YF_SESSION).news or []
-    except Exception:
-        return []
+    raw_news = fmp_get("news/stock", {"symbols": ticker.upper(), "limit": limit})[:limit]
 
     articles = []
-    for item in raw_news[:limit]:
-        content = item.get("content", {})
-
-        title = content.get("title")
-        link = (content.get("canonicalUrl") or {}).get("url") or (
-            content.get("clickThroughUrl") or {}
-        ).get("url")
+    for item in raw_news:
+        title = item.get("title")
+        link = item.get("url")
 
         if not title or not link:
             continue
 
-        publisher = (content.get("provider") or {}).get("displayName", "Unknown")
+        publisher = item.get("site") or item.get("publisher") or "Unknown"
 
         time_str = None
-        pub_date = content.get("pubDate")
+        pub_date = item.get("publishedDate")
         if pub_date:
             try:
-                parsed = datetime.strptime(pub_date, "%Y-%m-%dT%H:%M:%SZ")
+                parsed = datetime.strptime(pub_date, "%Y-%m-%d %H:%M:%S")
                 time_str = parsed.strftime("%b %d, %Y, %I:%M %p")
             except ValueError:
                 time_str = pub_date

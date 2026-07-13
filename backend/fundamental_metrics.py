@@ -1,6 +1,4 @@
-import yfinance as yf
-
-from yf_session import YF_SESSION
+from fmp_client import fmp_get_first
 
 
 def _score_higher_better(value, thresholds):
@@ -24,38 +22,46 @@ def _score_lower_better(value, thresholds):
 
 
 def calculate_fundamentals(ticker: str) -> dict:
-    info = yf.Ticker(ticker, session=YF_SESSION).info
+    profile = fmp_get_first("profile", ticker)
+    ratios = fmp_get_first("ratios-ttm", ticker)
+    key_metrics = fmp_get_first("key-metrics-ttm", ticker)
+    growth = fmp_get_first("financial-growth", ticker)
 
     revenue_growth_score = _score_higher_better(
-        info.get("revenueGrowth"), [(0.15, 12.5), (0.05, 8), (0, 4)]
+        growth.get("revenueGrowth"), [(0.15, 12.5), (0.05, 8), (0, 4)]
     )
     earnings_growth_score = _score_higher_better(
-        info.get("earningsGrowth"), [(0.15, 12.5), (0.05, 8), (0, 4)]
+        growth.get("epsgrowth"), [(0.15, 12.5), (0.05, 8), (0, 4)]
     )
     growth_score = revenue_growth_score + earnings_growth_score
 
     operating_margin_score = _score_higher_better(
-        info.get("operatingMargins"), [(0.20, 12.5), (0.10, 8), (0.05, 4)]
+        ratios.get("operatingProfitMarginTTM"), [(0.20, 12.5), (0.10, 8), (0.05, 4)]
     )
     roe_score = _score_higher_better(
-        info.get("returnOnEquity"), [(0.20, 12.5), (0.10, 8), (0.05, 4)]
+        key_metrics.get("returnOnEquityTTM"), [(0.20, 12.5), (0.10, 8), (0.05, 4)]
     )
     profitability_score = operating_margin_score + roe_score
 
     current_ratio_score = _score_higher_better(
-        info.get("currentRatio"), [(2.0, 12.5), (1.5, 10), (1.0, 5)]
+        ratios.get("currentRatioTTM"), [(2.0, 12.5), (1.5, 10), (1.0, 5)]
     )
-    # yfinance reports debtToEquity as a percentage (e.g. 50 == 0.5 ratio).
+    # FMP reports debtToEquityRatioTTM as a raw ratio (e.g. 0.5), but these
+    # thresholds are calibrated to yfinance's old percentage-scaled convention
+    # (e.g. 50 == 0.5 ratio) -- verified empirically that FMP's value is raw,
+    # not pre-scaled -- so multiply by 100 to reuse the same threshold scale.
+    debt_to_equity_ratio = ratios.get("debtToEquityRatioTTM")
     debt_to_equity_score = _score_lower_better(
-        info.get("debtToEquity"), [(50, 12.5), (100, 10), (200, 5)]
+        debt_to_equity_ratio * 100 if debt_to_equity_ratio is not None else None,
+        [(50, 12.5), (100, 10), (200, 5)],
     )
     health_score = current_ratio_score + debt_to_equity_score
 
     pe_score = _score_lower_better(
-        info.get("trailingPE"), [(15, 15), (25, 10), (35, 5)]
+        ratios.get("priceToEarningsRatioTTM"), [(15, 15), (25, 10), (35, 5)]
     )
     ps_score = _score_lower_better(
-        info.get("priceToSalesTrailing12Months"), [(2.0, 10), (5.0, 7), (10.0, 3)]
+        ratios.get("priceToSalesRatioTTM"), [(2.0, 10), (5.0, 7), (10.0, 3)]
     )
     valuation_score = pe_score + ps_score
 
@@ -69,7 +75,5 @@ def calculate_fundamentals(ticker: str) -> dict:
             "Health": health_score,
             "Valuation": valuation_score,
         },
-        # Free to include: `info` is already fetched above for scoring, so this adds
-        # no extra yfinance call. Lets callers cache a display name alongside the score.
-        "name": info.get("shortName") or info.get("longName"),
+        "name": profile.get("companyName"),
     }

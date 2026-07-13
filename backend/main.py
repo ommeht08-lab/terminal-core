@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 
 from backtester import run_backtest
-from data_engine import fetch_batch_quotes, fetch_ohlcv
+from data_engine import PolygonRateLimitError, fetch_batch_quotes, fetch_ohlcv
 from database import ResearchNote, Watchlist, get_db, init_db
 from fundamental_metrics import calculate_fundamentals
 from hybrid_engine import generate_hybrid_signal
@@ -96,6 +96,8 @@ def analyze(ticker: str, db: Session = Depends(get_db)):
         df = fetch_ohlcv(ticker.upper())
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except PolygonRateLimitError as e:
+        raise HTTPException(status_code=429, detail=str(e))
 
     metrics_df = calculate_metrics(df)
     latest = metrics_df.iloc[-1]
@@ -145,9 +147,10 @@ def watchlist_summary(body: WatchlistSummaryRequest, db: Session = Depends(get_d
     Deliberately skips the heavy per-ticker pipeline (SMAs, Wilder RSI, Z-score,
     nested news parsing) that GET /api/analyze/{ticker} runs -- that endpoint isn't
     safe to fan out to 50 tickers concurrently from the browser. Price + change come
-    from one batched yfinance call (see fetch_batch_quotes); fundamental_score/name
-    are read straight from the DB cache populated by GET /api/analyze/{ticker}, so
-    this route makes at most one yfinance request total, regardless of ticker count.
+    from Polygon's Grouped Daily endpoint (all US tickers for one trading day per
+    call, see fetch_batch_quotes) -- typically 2 calls total regardless of ticker
+    count, well within Polygon's 5-requests/minute free-tier cap. fundamental_score/
+    name are read straight from the DB cache populated by GET /api/analyze/{ticker}.
     """
     tickers = [t.upper() for t in body.tickers]
     if not tickers:
@@ -157,7 +160,10 @@ def watchlist_summary(body: WatchlistSummaryRequest, db: Session = Depends(get_d
         row.ticker: row
         for row in db.query(Watchlist).filter(Watchlist.ticker.in_(tickers)).all()
     }
-    quotes = fetch_batch_quotes(tickers)
+    try:
+        quotes = fetch_batch_quotes(tickers)
+    except PolygonRateLimitError as e:
+        raise HTTPException(status_code=429, detail=str(e))
 
     results = []
     for ticker in tickers:
