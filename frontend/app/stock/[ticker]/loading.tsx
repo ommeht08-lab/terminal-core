@@ -22,7 +22,7 @@ function MetricColumn() {
 
 export default function Loading() {
   return (
-    <div className="min-h-screen bg-[#0a0a0a]">
+    <div className="min-h-screen bg-[#020617]">
       <div className="max-w-5xl mx-auto p-4 space-y-4">
         <div className={`${cardClasses} p-4 flex flex-wrap items-center justify-between gap-4`}>
           <div className="flex items-baseline gap-3">

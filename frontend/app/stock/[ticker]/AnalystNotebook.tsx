@@ -95,7 +95,7 @@ export default function AnalystNotebook({
 
   const surfaceClasses = isExporting
     ? "bg-gray-50 border border-gray-200"
-    : "bg-black/20 border border-white/10";
+    : "bg-slate-950/40 border border-slate-700/50";
 
   return (
     <div className={`${cardClassesFor(isExporting)} p-4 flex flex-col h-full`}>
@@ -114,7 +114,7 @@ export default function AnalystNotebook({
               onClick={() => setTab(t)}
               className={`-mb-px border-b-2 px-3 py-1.5 text-xs font-medium uppercase tracking-wider transition-colors ${
                 tab === t
-                  ? "border-indigo-500 text-slate-200"
+                  ? "border-cyan-500 text-slate-200"
                   : "border-transparent text-slate-500 hover:text-slate-300"
               }`}
             >
@@ -131,7 +131,7 @@ export default function AnalystNotebook({
             onChange={handleChange}
             disabled={loading}
             placeholder="Write your research thesis in Markdown..."
-            className={`h-full w-full resize-none rounded-lg px-3 py-2 font-mono text-sm text-slate-100 placeholder:text-slate-600 transition-colors focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 ${surfaceClasses}`}
+            className={`h-full w-full resize-none rounded-lg px-3 py-2 font-mono text-sm text-slate-100 placeholder:text-slate-600 transition-colors focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 disabled:opacity-50 ${surfaceClasses}`}
           />
         ) : (
           <div className={`h-full overflow-y-auto rounded-lg px-4 py-3 ${surfaceClasses}`}>

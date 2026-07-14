@@ -23,7 +23,7 @@ export default async function StockPage({
 
   if (!data) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a]">
+      <div className="min-h-screen bg-[#020617]">
         <div className="max-w-5xl mx-auto p-4">
           <p className="text-rose-400">
             Failed to load data for {ticker.toUpperCase()}

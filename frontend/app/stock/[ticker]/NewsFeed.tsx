@@ -30,7 +30,7 @@ export default function NewsFeed({
                 className={`text-sm font-medium transition-colors ${
                   isExporting
                     ? "text-gray-900"
-                    : "text-slate-200 hover:text-indigo-400"
+                    : "text-slate-200 hover:text-cyan-400"
                 }`}
               >
                 {article.title}

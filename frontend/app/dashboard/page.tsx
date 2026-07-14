@@ -51,9 +51,9 @@ export default async function DashboardPage() {
             className={`${cardClasses} p-16 flex flex-col items-center justify-center gap-4 text-center`}
           >
             <div className="relative flex items-center justify-center">
-              <div className="absolute w-16 h-16 rounded-full bg-indigo-500/20 blur-xl" />
+              <div className="absolute w-16 h-16 rounded-full bg-cyan-500/20 blur-xl" />
               <svg
-                className="relative w-10 h-10 text-indigo-400"
+                className="relative w-10 h-10 text-cyan-400"
                 fill="none"
                 viewBox="0 0 24 24"
                 strokeWidth={1.5}

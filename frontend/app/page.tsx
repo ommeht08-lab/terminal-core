@@ -43,24 +43,24 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <section className="px-6 pt-24 pb-20 text-center">
-        <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
-          Om Mehta Equity Research
+        <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-slate-100 via-slate-100 to-cyan-400">
+          Prism Quantitative
         </h1>
         <p className="mt-5 max-w-xl mx-auto text-base md:text-lg text-slate-400">
-          A student-built platform focused on business quality, valuation
-          discipline, and thesis-driven investing.
+          A student-built equity research platform by Om Mehta, focused on
+          business quality, valuation discipline, and thesis-driven investing.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <Link
             href="/dashboard"
-            className="rounded-lg bg-indigo-500 hover:bg-indigo-400 text-white text-sm font-medium px-5 py-2.5 transition-colors"
+            className="rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-sm font-semibold px-5 py-2.5 transition-colors"
           >
-            Enter Terminal
+            View Dashboard
           </Link>
           {/* TODO: point at the real GitHub/LinkedIn URL once supplied. */}
           <Link
             href="#"
-            className="rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-slate-300 text-sm font-medium px-5 py-2.5 transition-colors"
+            className="rounded-lg bg-slate-900/40 border border-slate-700/50 hover:bg-slate-900/60 text-slate-300 text-sm font-medium px-5 py-2.5 transition-colors"
           >
             View on GitHub
           </Link>
@@ -91,7 +91,7 @@ export default function LandingPage() {
                 </p>
                 <Link
                   href={`/stock/${item.ticker}`}
-                  className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors"
+                  className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-cyan-400 hover:text-cyan-300 transition-colors"
                 >
                   View Tear Sheet
                   <span aria-hidden>&rarr;</span>
@@ -114,24 +114,22 @@ export default function LandingPage() {
               built to practice reading filings, backtesting signals, and
               writing theses the way a real analyst would.
             </p>
+            {/* TODO(om): add more accomplishments/activities here once supplied --
+                a prior draft incorrectly credited a nonprofit founding that
+                isn't accurate; removed rather than left in place. */}
             <ul className="mt-4 space-y-1.5 text-sm text-slate-400">
               <li className="flex gap-2">
                 <span className="text-slate-600">&mdash;</span>
                 DECA Officer
-              </li>
-              <li className="flex gap-2">
-                <span className="text-slate-600">&mdash;</span>
-                Founded DiaCare, a nonprofit focused on community awareness
-                and free clinic donations
               </li>
             </ul>
           </div>
         </div>
       </section>
 
-      <footer className="border-t border-white/5 px-6 py-8">
+      <footer className="border-t border-slate-800/60 px-6 py-8">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
-          <span>Built with Next.js 16 &middot; FastAPI &middot; SQLite &middot; Python</span>
+          <span>Prism Quantitative &middot; Built with Next.js 16, FastAPI, Postgres, Polygon &amp; FMP</span>
           <span>&copy; 2026 Om Mehta</span>
         </div>
       </footer>

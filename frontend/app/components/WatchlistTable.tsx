@@ -109,7 +109,7 @@ export default function WatchlistTable({ data }: { data: WatchlistSummaryItem[] 
               onClick={() => setActiveFilter(filter.key)}
               className={`rounded-full px-3 py-1.5 text-xs font-medium border transition-colors ${
                 active
-                  ? "bg-indigo-500/20 text-indigo-300 border-indigo-500/30"
+                  ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/30"
                   : "bg-white/5 text-slate-400 border-white/5 hover:text-slate-200"
               }`}
             >

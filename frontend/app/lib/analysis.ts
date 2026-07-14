@@ -71,7 +71,7 @@ export type AnalyzeResponse = {
 };
 
 export const cardClasses =
-  "bg-white/[0.03] border border-white/10 backdrop-blur-md rounded-2xl shadow-2xl hover:bg-white/[0.05] hover:border-white/20 transition-all duration-300";
+  "bg-slate-900/40 border border-slate-700/50 backdrop-blur-md rounded-2xl shadow-xl shadow-black/20 hover:bg-slate-900/60 hover:border-slate-600/60 transition-all duration-300";
 
 // Swaps glassmorphism for a flat light card while a PDF tear sheet is being
 // captured -- backdrop-blur/hover states don't matter for a static screenshot.
