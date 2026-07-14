@@ -1,8 +1,13 @@
+import xml.etree.ElementTree as ET
 from datetime import datetime
+from email.utils import parsedate_to_datetime
 
 import pandas as pd
+import requests
 
 from fmp_client import fmp_get, fmp_get_first
+
+GOOGLE_NEWS_RSS_URL = "https://news.google.com/rss/search"
 
 
 def calculate_rsi(close: pd.Series, period: int = 14) -> pd.Series:
@@ -101,15 +106,77 @@ def get_fundamental_snapshot(ticker: str) -> dict:
     }
 
 
+def _parse_google_news_rss(ticker: str, limit: int) -> list[dict]:
+    """Fallback news source: Google News' public RSS search feed, no API key
+    needed. Verified empirically against a real response, not assumed:
+    - <item><title> is formatted "Headline - Publisher", redundant with the
+      separate <source> element, so the " - Publisher" suffix is stripped.
+    - <link> is a Google News redirect URL (news.google.com/rss/articles/...),
+      not the direct publisher URL -- still a valid, clickable link, just an
+      extra hop; decoding the real destination would require following the
+      redirect server-side, not worth the added latency/fragility here.
+    - <pubDate> is RFC 822 (e.g. "Mon, 13 Jul 2026 18:29:00 GMT"), parsed with
+      email.utils rather than a fixed strptime pattern since RSS feeds aren't
+      guaranteed perfectly uniform.
+    Any failure (network error, malformed XML, unexpected structure) returns
+    [] rather than raising, so a bad feed never crashes the request.
+    """
+    try:
+        response = requests.get(
+            GOOGLE_NEWS_RSS_URL,
+            params={"q": f"{ticker} stock", "hl": "en-US", "gl": "US", "ceid": "US:en"},
+            timeout=10,
+        )
+        response.raise_for_status()
+        root = ET.fromstring(response.content)
+    except (requests.RequestException, ET.ParseError):
+        return []
+
+    articles = []
+    for item in root.findall("./channel/item")[:limit]:
+        title_el = item.find("title")
+        link_el = item.find("link")
+        source_el = item.find("source")
+        pubdate_el = item.find("pubDate")
+
+        title = title_el.text if title_el is not None else None
+        link = link_el.text if link_el is not None else None
+
+        if not title or not link:
+            continue
+
+        publisher = (
+            source_el.text if source_el is not None and source_el.text else "Unknown"
+        )
+
+        suffix = f" - {publisher}"
+        if publisher != "Unknown" and title.endswith(suffix):
+            title = title[: -len(suffix)]
+
+        time_str = None
+        if pubdate_el is not None and pubdate_el.text:
+            try:
+                parsed = parsedate_to_datetime(pubdate_el.text)
+                time_str = parsed.strftime("%b %d, %Y, %I:%M %p")
+            except (TypeError, ValueError):
+                time_str = pubdate_el.text
+
+        articles.append(
+            {"title": title, "publisher": publisher, "time": time_str, "link": link}
+        )
+
+    return articles
+
+
 def get_news(ticker: str, limit: int = 5) -> list[dict]:
-    """Fetch recent news headlines for a ticker via FMP.
+    """Fetch recent news headlines for a ticker, preferring FMP with a Google
+    News RSS fallback.
 
     FMP's news endpoint (/stable/news/stock) returns HTTP 402 "Restricted
     Endpoint" on the free tier this key is on -- confirmed against the live API,
-    not assumed -- so fmp_get() returns [] and this degrades to no articles
-    rather than erroring. The field-mapping below (title/publishedDate/site/url)
-    follows FMP's documented shape for when the endpoint becomes reachable, but
-    could not be verified against a real response since the plan blocks it.
+    not assumed -- so fmp_get() returns [] here today. Kept as the first attempt
+    in case the plan is upgraded later; falls back to Google News RSS
+    (_parse_google_news_rss) when FMP comes back empty.
     """
     raw_news = fmp_get("news/stock", {"symbols": ticker.upper(), "limit": limit})[:limit]
 
@@ -141,4 +208,7 @@ def get_news(ticker: str, limit: int = 5) -> list[dict]:
             }
         )
 
-    return articles
+    if articles:
+        return articles
+
+    return _parse_google_news_rss(ticker, limit)
