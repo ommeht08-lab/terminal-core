@@ -68,6 +68,11 @@ export type AnalyzeResponse = {
   roe: number | null;
   operating_margin: number | null;
   rsi_14: number | null;
+  net_profit_margin: number | null;
+  asset_turnover: number | null;
+  financial_leverage: number | null;
+  piotroski_score: number | null;
+  altman_z_score: number | null;
 };
 
 export const cardClasses =

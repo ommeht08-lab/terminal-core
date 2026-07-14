@@ -15,9 +15,11 @@ from database import ResearchNote, Watchlist, get_db, init_db
 from fundamental_metrics import calculate_fundamentals
 from hybrid_engine import generate_hybrid_signal
 from quant_metrics import (
+    SECTOR_NEWS_QUERIES,
     build_history,
     build_sparkline,
     calculate_metrics,
+    get_diagnostics,
     get_fundamental_snapshot,
     get_news,
 )
@@ -112,6 +114,7 @@ def analyze(ticker: str, db: Session = Depends(get_db)):
     sparkline = build_sparkline(metrics_df)
     news = get_news(ticker.upper())
     fundamental_snapshot = get_fundamental_snapshot(ticker.upper())
+    diagnostics = get_diagnostics(ticker.upper())
 
     return {
         "ticker": ticker.upper(),
@@ -137,6 +140,15 @@ def analyze(ticker: str, db: Session = Depends(get_db)):
         "roe": safe_round(fundamental_snapshot["roe"], digits=4),
         "operating_margin": safe_round(fundamental_snapshot["operating_margin"], digits=4),
         "rsi_14": safe_round(latest["RSI_14"]),
+        # DuPont ROE decomposition + systematic health scores, real values from
+        # FMP (see quant_metrics.get_diagnostics) -- net_profit_margin/
+        # asset_turnover are raw fractions/ratios like roe/operating_margin
+        # above, hence digits=4.
+        "net_profit_margin": safe_round(diagnostics["net_profit_margin"], digits=4),
+        "asset_turnover": safe_round(diagnostics["asset_turnover"], digits=4),
+        "financial_leverage": safe_round(diagnostics["financial_leverage"], digits=4),
+        "piotroski_score": safe_round(diagnostics["piotroski_score"], digits=0),
+        "altman_z_score": safe_round(diagnostics["altman_z_score"]),
     }
 
 
@@ -179,6 +191,23 @@ def watchlist_summary(body: WatchlistSummaryRequest, db: Session = Depends(get_d
             )
         )
     return results
+
+
+@app.get("/api/news/sector")
+def sector_news(sector: str):
+    """News for a macro sector (Sector Intel page), not a specific ticker.
+
+    `sector` is validated against SECTOR_NEWS_QUERIES (Technology/Finance/
+    Healthcare/Energy) rather than relayed into the Google News RSS query
+    unchecked -- this app has no legitimate use for arbitrary free-text here,
+    so an allowlist is simpler and safer than trying to sanitize open input.
+    """
+    if sector not in SECTOR_NEWS_QUERIES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown sector '{sector}'. Expected one of: {', '.join(SECTOR_NEWS_QUERIES)}",
+        )
+    return get_news(sector=sector)
 
 
 @app.get("/api/watchlist")

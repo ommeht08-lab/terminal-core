@@ -61,10 +61,16 @@ export default function Header() {
               Dashboard
             </Link>
             <Link
-              href="/journal"
+              href="/intel"
               className="text-sm text-slate-400 hover:text-white transition-colors"
             >
-              Journal
+              Sector Intel
+            </Link>
+            <Link
+              href="/long-term"
+              className="text-sm text-slate-400 hover:text-white transition-colors"
+            >
+              Long-Term
             </Link>
           </nav>
         </div>

@@ -11,8 +11,8 @@ import {
   trendBadgeClasses,
 } from "@/app/lib/analysis";
 import ExportButton from "@/app/components/ExportButton";
-import AnalystNotebook from "./AnalystNotebook";
 import BacktestResults from "./BacktestResults";
+import FinancialDiagnostics from "./FinancialDiagnostics";
 import NewsFeed from "./NewsFeed";
 import PriceChart from "./PriceChart";
 import WatchlistButton from "./WatchlistButton";
@@ -176,9 +176,9 @@ export default function TearSheet({ data }: { data: AnalyzeResponse }) {
             <NewsFeed news={data.news} isExporting={isExporting} />
           </div>
 
-          {/* Primary pane: the editor is the main event on this page. */}
-          <div className="lg:h-[calc(100vh-6.5rem)]">
-            <AnalystNotebook ticker={data.ticker} isExporting={isExporting} />
+          {/* Primary pane: read-only institutional diagnostics. */}
+          <div>
+            <FinancialDiagnostics data={data} isExporting={isExporting} />
           </div>
         </div>
       </div>

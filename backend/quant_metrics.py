@@ -1,6 +1,7 @@
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from email.utils import parsedate_to_datetime
+from typing import Optional
 
 import pandas as pd
 import requests
@@ -8,6 +9,17 @@ import requests
 from fmp_client import fmp_get, fmp_get_first
 
 GOOGLE_NEWS_RSS_URL = "https://news.google.com/rss/search"
+
+# Sector names accepted by get_news(sector=...) / GET /api/news/sector -- kept
+# as an explicit allowlist (validated in main.py, the actual request boundary)
+# rather than relaying arbitrary caller-supplied text into a Google search
+# query, since this app has no other use for free-text sector input.
+SECTOR_NEWS_QUERIES = {
+    "Technology": "Technology sector market",
+    "Finance": "Finance sector market",
+    "Healthcare": "Healthcare sector market",
+    "Energy": "Energy sector market",
+}
 
 
 def calculate_rsi(close: pd.Series, period: int = 14) -> pd.Series:
@@ -106,9 +118,42 @@ def get_fundamental_snapshot(ticker: str) -> dict:
     }
 
 
-def _parse_google_news_rss(ticker: str, limit: int) -> list[dict]:
+def get_diagnostics(ticker: str) -> dict:
+    """DuPont ROE decomposition + Piotroski/Altman scores, sourced entirely
+    from FMP's real ratios-ttm/key-metrics-ttm/financial-scores endpoints --
+    no synthesized or estimated values. financial-scores has the same
+    per-ticker restriction as other FMP endpoints on this plan (confirmed
+    empirically: works for AAPL/MSFT, HTTP 402s for BRK-B/LIN), so all fields
+    gracefully null rather than approximating when unavailable.
+
+    Note: net_profit_margin * asset_turnover * financial_leverage will not
+    always exactly reconcile to roe -- confirmed empirically (e.g. MSFT:
+    0.393 * 0.458 * 1.675 = 0.302 vs reported ROE 0.331) -- because FMP
+    computes these TTM ratios with slightly different period-averaging
+    methodologies across endpoints. Reporting the real components as-is
+    rather than forcing one to match, since adjusting a value just to make
+    the arithmetic look clean would itself be a form of fabrication.
+    """
+    ratios = fmp_get_first("ratios-ttm", ticker)
+    key_metrics = fmp_get_first("key-metrics-ttm", ticker)
+    scores = fmp_get_first("financial-scores", ticker)
+
+    return {
+        "net_profit_margin": _safe_float(ratios.get("netProfitMarginTTM")),
+        "asset_turnover": _safe_float(ratios.get("assetTurnoverTTM")),
+        "financial_leverage": _safe_float(ratios.get("financialLeverageRatioTTM")),
+        "roe": _safe_float(key_metrics.get("returnOnEquityTTM")),
+        "piotroski_score": _safe_float(scores.get("piotroskiScore")),
+        "altman_z_score": _safe_float(scores.get("altmanZScore")),
+    }
+
+
+def _parse_google_news_rss(query: str, limit: int) -> list[dict]:
     """Fallback news source: Google News' public RSS search feed, no API key
-    needed. Verified empirically against a real response, not assumed:
+    needed. `query` is a pre-built search string (e.g. "AAPL stock" or
+    "Technology sector market") -- callers own query construction so this
+    stays a generic RSS-fetch-and-parse helper. Verified empirically against a
+    real response, not assumed:
     - <item><title> is formatted "Headline - Publisher", redundant with the
       separate <source> element, so the " - Publisher" suffix is stripped.
     - <link> is a Google News redirect URL (news.google.com/rss/articles/...),
@@ -124,7 +169,7 @@ def _parse_google_news_rss(ticker: str, limit: int) -> list[dict]:
     try:
         response = requests.get(
             GOOGLE_NEWS_RSS_URL,
-            params={"q": f"{ticker} stock", "hl": "en-US", "gl": "US", "ceid": "US:en"},
+            params={"q": query, "hl": "en-US", "gl": "US", "ceid": "US:en"},
             timeout=10,
         )
         response.raise_for_status()
@@ -168,47 +213,59 @@ def _parse_google_news_rss(ticker: str, limit: int) -> list[dict]:
     return articles
 
 
-def get_news(ticker: str, limit: int = 5) -> list[dict]:
-    """Fetch recent news headlines for a ticker, preferring FMP with a Google
-    News RSS fallback.
+def get_news(
+    ticker: Optional[str] = None, sector: Optional[str] = None, limit: int = 5
+) -> list[dict]:
+    """Fetch recent news headlines for either a ticker or a macro sector.
 
-    FMP's news endpoint (/stable/news/stock) returns HTTP 402 "Restricted
-    Endpoint" on the free tier this key is on -- confirmed against the live API,
-    not assumed -- so fmp_get() returns [] here today. Kept as the first attempt
-    in case the plan is upgraded later; falls back to Google News RSS
-    (_parse_google_news_rss) when FMP comes back empty.
+    Exactly one of ticker/sector should be given; returns [] if neither is
+    provided rather than guessing. Ticker requests try FMP first (its
+    /stable/news/stock endpoint returns HTTP 402 "Restricted Endpoint" on the
+    free tier this key is on -- confirmed against the live API, not assumed --
+    so fmp_get() returns [] here today; kept as the first attempt in case the
+    plan is upgraded). FMP has no sector-level news endpoint, so sector
+    requests go straight to Google News RSS. Both paths ultimately fall back
+    to _parse_google_news_rss, which degrades to [] on any failure rather than
+    raising -- callers never need to handle an exception from this function.
     """
-    raw_news = fmp_get("news/stock", {"symbols": ticker.upper(), "limit": limit})[:limit]
+    if ticker:
+        raw_news = fmp_get("news/stock", {"symbols": ticker.upper(), "limit": limit})[:limit]
 
-    articles = []
-    for item in raw_news:
-        title = item.get("title")
-        link = item.get("url")
+        articles = []
+        for item in raw_news:
+            title = item.get("title")
+            link = item.get("url")
 
-        if not title or not link:
-            continue
+            if not title or not link:
+                continue
 
-        publisher = item.get("site") or item.get("publisher") or "Unknown"
+            publisher = item.get("site") or item.get("publisher") or "Unknown"
 
-        time_str = None
-        pub_date = item.get("publishedDate")
-        if pub_date:
-            try:
-                parsed = datetime.strptime(pub_date, "%Y-%m-%d %H:%M:%S")
-                time_str = parsed.strftime("%b %d, %Y, %I:%M %p")
-            except ValueError:
-                time_str = pub_date
+            time_str = None
+            pub_date = item.get("publishedDate")
+            if pub_date:
+                try:
+                    parsed = datetime.strptime(pub_date, "%Y-%m-%d %H:%M:%S")
+                    time_str = parsed.strftime("%b %d, %Y, %I:%M %p")
+                except ValueError:
+                    time_str = pub_date
 
-        articles.append(
-            {
-                "title": title,
-                "publisher": publisher,
-                "time": time_str,
-                "link": link,
-            }
-        )
+            articles.append(
+                {
+                    "title": title,
+                    "publisher": publisher,
+                    "time": time_str,
+                    "link": link,
+                }
+            )
 
-    if articles:
-        return articles
+        if articles:
+            return articles
 
-    return _parse_google_news_rss(ticker, limit)
+        return _parse_google_news_rss(f"{ticker} stock", limit)
+
+    if sector:
+        query = SECTOR_NEWS_QUERIES.get(sector, f"{sector} sector market")
+        return _parse_google_news_rss(query, limit)
+
+    return []
