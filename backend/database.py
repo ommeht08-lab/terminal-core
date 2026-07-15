@@ -60,6 +60,22 @@ class ResearchNote(Base):
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
+class AlgoConfig(Base):
+    """Singleton row (always id=1) of tunable parameters for the Java
+    execution engine's mean-reversion strategy. This app only reads/writes
+    the row -- it has no channel to the engine itself, so these values only
+    take effect if/however the engine is set up to poll this table. See
+    GET/POST /api/bot/config in main.py.
+    """
+
+    __tablename__ = "algo_config"
+
+    id = Column(Integer, primary_key=True)
+    ma_lookback_period = Column(Integer, nullable=False, default=20)
+    std_dev_multiplier = Column(Float, nullable=False, default=2.0)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
 def init_db():
     Base.metadata.create_all(bind=engine)
     _add_missing_columns("watchlist", {"name": "VARCHAR", "fundamental_score": "FLOAT"})

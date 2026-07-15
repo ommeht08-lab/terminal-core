@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from typing import List, Optional
@@ -12,7 +12,7 @@ from typing import List, Optional
 from alpaca_client import get_bot_pnl, get_bot_positions
 from backtester import run_backtest
 from data_engine import PolygonRateLimitError, fetch_batch_quotes, fetch_ohlcv
-from database import ResearchNote, Watchlist, get_db, init_db
+from database import AlgoConfig, ResearchNote, Watchlist, get_db, init_db
 from fundamental_metrics import calculate_fundamentals
 from hybrid_engine import generate_hybrid_signal
 from quant_metrics import (
@@ -54,6 +54,11 @@ def on_startup():
 
 class NoteBody(BaseModel):
     content: str
+
+
+class AlgoConfigBody(BaseModel):
+    ma_lookback_period: int = Field(gt=0, le=500)
+    std_dev_multiplier: float = Field(gt=0, le=10)
 
 
 # Single-user app, no auth system -- hardcoded so every note's byline is attached
@@ -238,6 +243,55 @@ def bot_pnl():
     trailing 30 days.
     """
     return get_bot_pnl()
+
+
+def _serialize_algo_config(config: AlgoConfig) -> dict:
+    return {
+        "ma_lookback_period": config.ma_lookback_period,
+        "std_dev_multiplier": config.std_dev_multiplier,
+        "updated_at": config.updated_at.isoformat() if config.updated_at else None,
+    }
+
+
+@app.get("/api/bot/config")
+def get_bot_config(db: Session = Depends(get_db)):
+    """Current tunable parameters for the execution engine's strategy.
+    Singleton row, created with sane defaults on first read rather than
+    requiring a separate seed step.
+    """
+    config = db.query(AlgoConfig).first()
+    if config is None:
+        config = AlgoConfig(ma_lookback_period=20, std_dev_multiplier=2.0)
+        db.add(config)
+        db.commit()
+        db.refresh(config)
+    return _serialize_algo_config(config)
+
+
+@app.post("/api/bot/config")
+def update_bot_config(body: AlgoConfigBody, db: Session = Depends(get_db)):
+    """Persists new strategy parameters. This app has no channel to the Java
+    engine itself -- it only writes the row here, so the update only takes
+    effect if/however that engine is set up to poll this table.
+    """
+    config = db.query(AlgoConfig).first()
+    now = datetime.now(timezone.utc)
+
+    if config is None:
+        config = AlgoConfig(
+            ma_lookback_period=body.ma_lookback_period,
+            std_dev_multiplier=body.std_dev_multiplier,
+            updated_at=now,
+        )
+        db.add(config)
+    else:
+        config.ma_lookback_period = body.ma_lookback_period
+        config.std_dev_multiplier = body.std_dev_multiplier
+        config.updated_at = now
+
+    db.commit()
+    db.refresh(config)
+    return _serialize_algo_config(config)
 
 
 @app.get("/api/watchlist")

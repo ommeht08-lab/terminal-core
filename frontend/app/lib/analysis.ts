@@ -120,6 +120,15 @@ export type BotPnlResponse = {
   equity_curve: BotEquityPoint[];
 };
 
+// Matches backend GET/POST /api/bot/config. This app only persists these
+// values -- it has no channel to the Java execution engine itself, so an
+// update only takes effect if/however that engine polls this table.
+export type AlgoConfig = {
+  ma_lookback_period: number;
+  std_dev_multiplier: number;
+  updated_at: string | null;
+};
+
 // Matches backend GET /api/valuation/{ticker}. `available` is False whenever
 // any of the four raw DCF inputs is missing (FMP's per-ticker fundamentals
 // restriction) -- the frontend must never run the DCF model on a partial set

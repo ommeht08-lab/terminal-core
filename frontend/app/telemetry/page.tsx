@@ -18,6 +18,7 @@ import {
   cardClasses,
   changeColorClass,
 } from "@/app/lib/analysis";
+import RiskControls from "./RiskControls";
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -228,6 +229,8 @@ export default function TelemetryPage() {
             </div>
           )}
         </div>
+
+        <RiskControls />
       </div>
     </div>
   );
