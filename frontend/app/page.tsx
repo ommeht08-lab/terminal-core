@@ -55,7 +55,7 @@ export default function LandingPage() {
             href="/dashboard"
             className="rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-sm font-semibold px-5 py-2.5 transition-colors"
           >
-            View Dashboard
+            Active Coverage
           </Link>
           {/* TODO: point at the real GitHub/LinkedIn URL once supplied. */}
           <Link
