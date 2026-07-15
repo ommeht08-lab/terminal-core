@@ -132,12 +132,6 @@ export function signalBadgeClasses(signal: string): string {
   }
 }
 
-export function trendColorClass(trend: string): string {
-  if (trend === "Bullish") return "text-emerald-400";
-  if (trend === "Bearish") return "text-rose-400";
-  return "text-slate-300";
-}
-
 export function trendBadgeClasses(trend: string): string {
   if (trend === "Bullish")
     return "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
