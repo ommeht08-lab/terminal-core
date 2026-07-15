@@ -1,45 +1,34 @@
 import Link from "next/link";
-import { cardClasses } from "@/app/lib/analysis";
+import { API_BASE, RecentThesis, cardClasses } from "@/app/lib/analysis";
 
-type FeaturedThesis = {
-  ticker: string;
-  name: string;
-  thesis: string;
-  date: string;
-};
+const dateFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
 
-const FEATURED_THESES: FeaturedThesis[] = [
-  {
-    ticker: "AAPL",
-    name: "Apple Inc.",
-    thesis:
-      "Services mix-shift and installed-base loyalty support durable margin expansion even as hardware unit growth normalizes.",
-    date: "Jun 18, 2026",
-  },
-  {
-    ticker: "MSFT",
-    name: "Microsoft Corporation",
-    thesis:
-      "Azure's AI-driven consumption growth and Copilot attach rates justify a premium multiple relative to legacy enterprise software peers.",
-    date: "Jun 2, 2026",
-  },
-  {
-    ticker: "CRWD",
-    name: "CrowdStrike Holdings",
-    thesis:
-      "Platform consolidation into the Falcon suite drives net-retention expansion, though valuation leaves little room for execution missteps.",
-    date: "May 21, 2026",
-  },
-  {
-    ticker: "NVDA",
-    name: "NVIDIA Corporation",
-    thesis:
-      "The full-stack AI infrastructure moat remains intact, but the thesis hinges on hyperscaler capex discipline holding through the cycle.",
-    date: "May 9, 2026",
-  },
-];
+function formatThesisDate(updatedAt: string | null): string | null {
+  if (!updatedAt) return null;
+  const parsed = new Date(updatedAt);
+  return Number.isNaN(parsed.getTime()) ? null : dateFormatter.format(parsed);
+}
 
-export default function LandingPage() {
+// Real journal data only -- no mock/placeholder theses. A fetch failure or an
+// empty journal both resolve to [], and the page renders its own "no theses
+// yet" state rather than ever falling back to fabricated content.
+async function getRecentTheses(): Promise<RecentThesis[]> {
+  try {
+    const res = await fetch(`${API_BASE}/api/journal/recent`, { cache: "no-store" });
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
+}
+
+export default async function LandingPage() {
+  const theses = await getRecentTheses();
+
   return (
     <div className="min-h-screen flex flex-col">
       <section className="px-6 pt-24 pb-20 text-center">
@@ -72,33 +61,43 @@ export default function LandingPage() {
           <h2 className="text-xs font-semibold tracking-wider text-slate-500 uppercase">
             Recent Theses
           </h2>
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-            {FEATURED_THESES.map((item) => (
-              <div key={item.ticker} className={`${cardClasses} p-6 flex flex-col`}>
-                <div className="flex items-baseline justify-between gap-3">
-                  <div>
-                    <span className="font-mono font-bold text-lg text-slate-100">
-                      {item.ticker}
-                    </span>
-                    <span className="ml-2 text-sm text-slate-500">{item.name}</span>
+          {theses.length === 0 ? (
+            <div className={`mt-4 ${cardClasses} p-8 text-center`}>
+              <p className="text-sm text-slate-500">No recent theses published yet.</p>
+            </div>
+          ) : (
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              {theses.map((item) => (
+                <div key={item.ticker} className={`${cardClasses} p-6 flex flex-col`}>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <div>
+                      <span className="font-mono font-bold text-lg text-slate-100">
+                        {item.ticker}
+                      </span>
+                      {item.name && (
+                        <span className="ml-2 text-sm text-slate-500">{item.name}</span>
+                      )}
+                    </div>
+                    {formatThesisDate(item.updated_at) && (
+                      <span className="text-xs text-slate-500 whitespace-nowrap">
+                        {formatThesisDate(item.updated_at)}
+                      </span>
+                    )}
                   </div>
-                  <span className="text-xs text-slate-500 whitespace-nowrap">
-                    {item.date}
-                  </span>
+                  <p className="mt-3 text-sm text-slate-300 leading-relaxed flex-1">
+                    {item.excerpt}
+                  </p>
+                  <Link
+                    href={`/stock/${item.ticker}`}
+                    className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-cyan-400 hover:text-cyan-300 transition-colors"
+                  >
+                    View Tear Sheet
+                    <span aria-hidden>&rarr;</span>
+                  </Link>
                 </div>
-                <p className="mt-3 text-sm text-slate-300 leading-relaxed flex-1">
-                  {item.thesis}
-                </p>
-                <Link
-                  href={`/stock/${item.ticker}`}
-                  className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-cyan-400 hover:text-cyan-300 transition-colors"
-                >
-                  View Tear Sheet
-                  <span aria-hidden>&rarr;</span>
-                </Link>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

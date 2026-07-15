@@ -35,6 +35,18 @@ export type NewsArticle = {
   link: string;
 };
 
+// Matches backend GET /api/journal/recent -- the landing page's Recent
+// Theses grid. `name` is null until a ticker has been individually analyzed
+// at least once (same Watchlist name-cache convention as
+// WatchlistSummaryItem). `excerpt` is a plain-text preview of the note's
+// markdown content, already truncated server-side.
+export type RecentThesis = {
+  ticker: string;
+  name: string | null;
+  excerpt: string;
+  updated_at: string | null;
+};
+
 // Matches backend WatchlistSummaryItem (POST /api/watchlist/summary). Deliberately
 // lighter than AnalyzeResponse -- no trend/z_score/sparkline, since that endpoint
 // skips the heavy per-ticker pipeline. name/fundamental_score are null until a

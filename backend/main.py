@@ -301,3 +301,60 @@ def save_note(ticker: str, body: NoteBody, db: Session = Depends(get_db)):
         "author": NOTE_AUTHOR,
         "updated_at": now.isoformat(),
     }
+
+
+def _note_excerpt(content: str, max_len: int = 200) -> str:
+    """Plain-text preview of a research note's markdown content, for the
+    landing page's Recent Theses card. Strips a single leading '# Heading'
+    line (the journal editor's own convention) rather than running a full
+    markdown parser for a one-line preview. If the note is nothing but a
+    heading (real case: an existing NVDA note is just "# Updated thesis"),
+    falls back to the heading text itself instead of returning an empty
+    excerpt -- still the founder's real words, not synthesized filler.
+    """
+    text = content.strip()
+    lines = text.split("\n", 1)
+
+    if lines[0].startswith("#"):
+        heading = lines[0].lstrip("#").strip()
+        body = lines[1].strip() if len(lines) > 1 else ""
+        preview = body or heading
+    else:
+        preview = text
+
+    if len(preview) <= max_len:
+        return preview
+
+    return preview[:max_len].rsplit(" ", 1)[0] + "…"
+
+
+@app.get("/api/journal/recent")
+def recent_theses(limit: int = 4, db: Session = Depends(get_db)):
+    """Latest research notes for the landing page's Recent Theses grid.
+    Real journal data only -- an empty list here means the page renders its
+    own "no theses yet" state rather than falling back to mock content.
+    """
+    notes = (
+        db.query(ResearchNote)
+        .order_by(ResearchNote.updated_at.desc())
+        .limit(limit)
+        .all()
+    )
+    if not notes:
+        return []
+
+    tickers = [note.ticker for note in notes]
+    names = {
+        row.ticker: row.name
+        for row in db.query(Watchlist).filter(Watchlist.ticker.in_(tickers)).all()
+    }
+
+    return [
+        {
+            "ticker": note.ticker,
+            "name": names.get(note.ticker),
+            "excerpt": _note_excerpt(note.content),
+            "updated_at": note.updated_at.isoformat() if note.updated_at else None,
+        }
+        for note in notes
+    ]
