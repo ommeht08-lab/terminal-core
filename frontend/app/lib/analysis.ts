@@ -129,6 +129,27 @@ export type AlgoConfig = {
   updated_at: string | null;
 };
 
+// Matches backend POST /api/backtest. This is the Telemetry page's own
+// simulation of the Risk Controls parameters against real historical
+// OHLCV -- not a verified replica of the Java execution engine's live
+// logic, which this app can't see. Distinct from the tear sheet's
+// BacktestResult (fixed 20-day Z-Score strategy, no Sharpe/equity curve).
+export type BacktestEquityPoint = {
+  date: string;
+  strategy_equity: number;
+  buy_hold_equity: number;
+};
+
+export type HistoricalBacktestResult = {
+  ticker: string;
+  total_return: number;
+  sharpe_ratio: number;
+  max_drawdown: number;
+  win_rate: number;
+  total_trades: number;
+  equity_curve: BacktestEquityPoint[];
+};
+
 // Matches backend GET /api/valuation/{ticker}. `available` is False whenever
 // any of the four raw DCF inputs is missing (FMP's per-ticker fundamentals
 // restriction) -- the frontend must never run the DCF model on a partial set

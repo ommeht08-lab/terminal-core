@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 
 from alpaca_client import get_bot_pnl, get_bot_positions
-from backtester import run_backtest
+from backtester import run_backtest, run_mean_reversion_backtest
 from data_engine import PolygonRateLimitError, fetch_batch_quotes, fetch_ohlcv
 from database import AlgoConfig, ResearchNote, Watchlist, get_db, init_db
 from fundamental_metrics import calculate_fundamentals
@@ -59,6 +59,12 @@ class NoteBody(BaseModel):
 class AlgoConfigBody(BaseModel):
     ma_lookback_period: int = Field(gt=0, le=500)
     std_dev_multiplier: float = Field(gt=0, le=10)
+
+
+class BacktestRequest(BaseModel):
+    ticker: str = "AAPL"
+    ma_lookback_period: int = Field(20, gt=0, le=500)
+    std_dev_multiplier: float = Field(2.0, gt=0, le=10)
 
 
 # Single-user app, no auth system -- hardcoded so every note's byline is attached
@@ -292,6 +298,29 @@ def update_bot_config(body: AlgoConfigBody, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(config)
     return _serialize_algo_config(config)
+
+
+@app.post("/api/backtest")
+def backtest(body: BacktestRequest):
+    """Historical simulation of the Risk Controls' mean-reversion parameters
+    against real Polygon OHLCV (~2 years on the free tier, same source and
+    truncation behavior as /api/analyze/{ticker}). Lets a user try out
+    ma_lookback_period/std_dev_multiplier changes against real price history
+    before deciding whether to actually update the live config.
+    """
+    ticker = body.ticker.upper()
+
+    try:
+        df = fetch_ohlcv(ticker)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except PolygonRateLimitError as e:
+        raise HTTPException(status_code=429, detail=str(e))
+
+    result = run_mean_reversion_backtest(
+        df, body.ma_lookback_period, body.std_dev_multiplier
+    )
+    return {"ticker": ticker, **result}
 
 
 @app.get("/api/watchlist")

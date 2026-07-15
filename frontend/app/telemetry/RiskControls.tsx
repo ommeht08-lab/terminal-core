@@ -5,13 +5,26 @@ import { API_BASE, AlgoConfig, cardClasses } from "@/app/lib/analysis";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
-export default function RiskControls() {
+// maLookback/stdDevMultiplier are controlled by the parent TelemetryPage
+// rather than owned locally -- the Backtest Strategy section needs to read
+// these exact live values (saved or not) to simulate "what would these
+// parameters have done historically", so both panels share one source of
+// truth instead of drifting out of sync.
+export default function RiskControls({
+  maLookback,
+  stdDevMultiplier,
+  onMaLookbackChange,
+  onStdDevMultiplierChange,
+}: {
+  maLookback: string;
+  stdDevMultiplier: string;
+  onMaLookbackChange: (value: string) => void;
+  onStdDevMultiplierChange: (value: string) => void;
+}) {
   const [config, setConfig] = useState<AlgoConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
 
-  const [maLookback, setMaLookback] = useState("20");
-  const [stdDevMultiplier, setStdDevMultiplier] = useState("2.0");
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
@@ -26,8 +39,8 @@ export default function RiskControls() {
       .then((data: AlgoConfig) => {
         if (cancelled) return;
         setConfig(data);
-        setMaLookback(String(data.ma_lookback_period));
-        setStdDevMultiplier(String(data.std_dev_multiplier));
+        onMaLookbackChange(String(data.ma_lookback_period));
+        onStdDevMultiplierChange(String(data.std_dev_multiplier));
       })
       .catch(() => {
         if (!cancelled) setLoadError(true);
@@ -39,6 +52,9 @@ export default function RiskControls() {
     return () => {
       cancelled = true;
     };
+    // Only ever runs once on mount to hydrate the parent's state from the
+    // persisted config -- intentionally excludes the onChange callbacks.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -115,7 +131,7 @@ export default function RiskControls() {
                 step={1}
                 value={maLookback}
                 onChange={(e) => {
-                  setMaLookback(e.target.value);
+                  onMaLookbackChange(e.target.value);
                   setSaveState("idle");
                 }}
                 className="mt-1.5 w-full rounded-lg bg-slate-900/40 border border-slate-700/50 px-3 py-2 text-sm text-slate-100 font-mono focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
@@ -130,7 +146,7 @@ export default function RiskControls() {
                 step={0.1}
                 value={stdDevMultiplier}
                 onChange={(e) => {
-                  setStdDevMultiplier(e.target.value);
+                  onStdDevMultiplierChange(e.target.value);
                   setSaveState("idle");
                 }}
                 className="mt-1.5 w-full rounded-lg bg-slate-900/40 border border-slate-700/50 px-3 py-2 text-sm text-slate-100 font-mono focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"

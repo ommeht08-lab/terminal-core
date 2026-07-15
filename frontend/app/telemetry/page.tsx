@@ -18,6 +18,7 @@ import {
   cardClasses,
   changeColorClass,
 } from "@/app/lib/analysis";
+import BacktestStrategy from "./BacktestStrategy";
 import RiskControls from "./RiskControls";
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
@@ -58,6 +59,11 @@ export default function TelemetryPage() {
 
   const [positions, setPositions] = useState<BotPositionsResponse | null>(null);
   const [positionsLoading, setPositionsLoading] = useState(true);
+
+  // Shared with BacktestStrategy so "Run Historical Backtest" always tests
+  // exactly what's currently in the Risk Controls form, saved or not.
+  const [maLookback, setMaLookback] = useState("20");
+  const [stdDevMultiplier, setStdDevMultiplier] = useState("2.0");
 
   useEffect(() => {
     let cancelled = false;
@@ -230,7 +236,14 @@ export default function TelemetryPage() {
           )}
         </div>
 
-        <RiskControls />
+        <RiskControls
+          maLookback={maLookback}
+          stdDevMultiplier={stdDevMultiplier}
+          onMaLookbackChange={setMaLookback}
+          onStdDevMultiplierChange={setStdDevMultiplier}
+        />
+
+        <BacktestStrategy maLookback={maLookback} stdDevMultiplier={stdDevMultiplier} />
       </div>
     </div>
   );
