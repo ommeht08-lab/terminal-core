@@ -1,4 +1,4 @@
-import { API_BASE, AnalyzeResponse } from "@/app/lib/analysis";
+import { API_BASE, AnalyzeResponse, ValuationInputs } from "@/app/lib/analysis";
 import TearSheet from "./TearSheet";
 
 async function getAnalysis(ticker: string): Promise<AnalyzeResponse | null> {
@@ -13,13 +13,38 @@ async function getAnalysis(ticker: string): Promise<AnalyzeResponse | null> {
   return res.json();
 }
 
+function unavailableValuation(ticker: string): ValuationInputs {
+  return {
+    ticker,
+    available: false,
+    free_cash_flow: null,
+    total_debt: null,
+    cash_and_equivalents: null,
+    shares_outstanding: null,
+    current_price: null,
+  };
+}
+
+// DCF inputs are a separate, independently-degrading fetch -- a missing/failed
+// valuation should never take down the rest of the tear sheet, so failures
+// here resolve to an "unavailable" shape rather than throwing.
+async function getValuation(ticker: string): Promise<ValuationInputs> {
+  try {
+    const res = await fetch(`${API_BASE}/api/valuation/${ticker}`, { cache: "no-store" });
+    if (!res.ok) return unavailableValuation(ticker);
+    return await res.json();
+  } catch {
+    return unavailableValuation(ticker);
+  }
+}
+
 export default async function StockPage({
   params,
 }: {
   params: Promise<{ ticker: string }>;
 }) {
   const { ticker } = await params;
-  const data = await getAnalysis(ticker);
+  const [data, valuation] = await Promise.all([getAnalysis(ticker), getValuation(ticker)]);
 
   if (!data) {
     return (
@@ -33,5 +58,5 @@ export default async function StockPage({
     );
   }
 
-  return <TearSheet data={data} />;
+  return <TearSheet data={data} valuation={valuation} />;
 }

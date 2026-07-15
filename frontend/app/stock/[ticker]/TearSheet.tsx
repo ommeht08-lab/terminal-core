@@ -4,6 +4,7 @@ import { useState } from "react";
 import generatePDF from "react-to-pdf";
 import {
   AnalyzeResponse,
+  ValuationInputs,
   cardClasses,
   cardClassesFor,
   formatValue,
@@ -15,6 +16,7 @@ import BacktestResults from "./BacktestResults";
 import FinancialDiagnostics from "./FinancialDiagnostics";
 import NewsFeed from "./NewsFeed";
 import PriceChart from "./PriceChart";
+import ValuationTool from "./ValuationTool";
 import WatchlistButton from "./WatchlistButton";
 
 const TEAR_SHEET_ID = "tear-sheet";
@@ -50,7 +52,13 @@ function formatRatio(value: number | null): string {
   return value === null ? "N/A" : value.toFixed(2);
 }
 
-export default function TearSheet({ data }: { data: AnalyzeResponse }) {
+export default function TearSheet({
+  data,
+  valuation,
+}: {
+  data: AnalyzeResponse;
+  valuation: ValuationInputs;
+}) {
   const [isExporting, setIsExporting] = useState(false);
 
   function handleExport() {
@@ -176,9 +184,28 @@ export default function TearSheet({ data }: { data: AnalyzeResponse }) {
             <NewsFeed news={data.news} isExporting={isExporting} />
           </div>
 
-          {/* Primary pane: read-only institutional diagnostics. */}
-          <div>
+          {/* Primary pane: read-only institutional diagnostics + the
+              interactive DCF tool right below it. */}
+          <div className="space-y-4">
             <FinancialDiagnostics data={data} isExporting={isExporting} />
+
+            {valuation.available ? (
+              <ValuationTool inputs={valuation} isExporting={isExporting} />
+            ) : (
+              <div className={`${cardClassesFor(isExporting)} p-4`}>
+                <h2 className="text-xs font-semibold tracking-wider text-slate-500 uppercase">
+                  Interactive DCF Valuation
+                </h2>
+                <p
+                  className={`mt-3 text-sm ${
+                    isExporting ? "text-gray-500" : "text-slate-500"
+                  }`}
+                >
+                  Valuation data isn&rsquo;t available for {data.ticker} right now &mdash;
+                  FMP may not report full fundamentals for this ticker on the current plan.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
