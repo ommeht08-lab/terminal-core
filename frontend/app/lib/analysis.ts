@@ -150,6 +150,39 @@ export type HistoricalBacktestResult = {
   equity_curve: BacktestEquityPoint[];
 };
 
+// Matches backend GET /api/portfolio/optimize. `weights` are percentages
+// (sum to 100) keyed by ticker, only covering `tickers_used` -- which is
+// frequently a subset of the full watchlist, since Polygon's rate limit
+// (see `rate_limited`) makes fetching a large watchlist in one request
+// unworkable. `available: false` covers both an empty/near-empty watchlist
+// (`reason: "insufficient_tickers"`) and a rate limit hit before 2 tickers
+// could be fetched (`reason: "rate_limited"`).
+export type PortfolioWeights = Record<string, number>;
+
+export type OptimizedPortfolio = {
+  expected_return: number;
+  volatility: number;
+  sharpe_ratio: number;
+  weights: PortfolioWeights;
+};
+
+export type RandomPortfolioPoint = {
+  return: number;
+  volatility: number;
+  sharpe_ratio: number;
+};
+
+export type PortfolioOptimizeResponse = {
+  available: boolean;
+  reason: "rate_limited" | "insufficient_tickers" | null;
+  tickers_used: string[];
+  requested_count: number;
+  rate_limited: boolean;
+  max_sharpe_portfolio: OptimizedPortfolio | null;
+  min_volatility_portfolio: OptimizedPortfolio | null;
+  random_portfolios: RandomPortfolioPoint[];
+};
+
 // Matches backend GET /api/valuation/{ticker}. `available` is False whenever
 // any of the four raw DCF inputs is missing (FMP's per-ticker fundamentals
 // restriction) -- the frontend must never run the DCF model on a partial set

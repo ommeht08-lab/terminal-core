@@ -13,6 +13,7 @@ from alpaca_client import get_bot_pnl, get_bot_positions
 from backtester import run_backtest, run_mean_reversion_backtest
 from data_engine import PolygonRateLimitError, fetch_batch_quotes, fetch_ohlcv
 from database import AlgoConfig, ResearchNote, Watchlist, get_db, init_db
+from portfolio_optimizer import optimize_portfolio
 from fundamental_metrics import calculate_fundamentals
 from hybrid_engine import generate_hybrid_signal
 from quant_metrics import (
@@ -337,6 +338,18 @@ def screener_volatility(db: Session = Depends(get_db)):
     """
     tickers = [row.ticker for row in db.query(Watchlist).order_by(Watchlist.ticker).all()]
     return screen_volatility(tickers)
+
+
+@app.get("/api/portfolio/optimize")
+def portfolio_optimize(db: Session = Depends(get_db)):
+    """Markowitz mean-variance optimization (Max Sharpe / Min Volatility
+    portfolios + an Efficient Frontier random-portfolio cloud) over the
+    current Watchlist. See optimize_portfolio() for the Polygon rate-limit
+    handling -- `available: False` covers both an empty/near-empty watchlist
+    and a rate limit hit before 2 tickers could be fetched.
+    """
+    tickers = [row.ticker for row in db.query(Watchlist).order_by(Watchlist.ticker).all()]
+    return optimize_portfolio(tickers)
 
 
 @app.post("/api/watchlist/{ticker}")

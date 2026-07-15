@@ -1,7 +1,14 @@
 import DashboardSummary from "@/app/components/DashboardSummary";
+import EfficientFrontier from "@/app/components/EfficientFrontier";
 import VolatilityScreener from "@/app/components/VolatilityScreener";
 import WatchlistTable from "@/app/components/WatchlistTable";
-import { API_BASE, VolatilityScreenerResponse, WatchlistSummaryItem, cardClasses } from "@/app/lib/analysis";
+import {
+  API_BASE,
+  PortfolioOptimizeResponse,
+  VolatilityScreenerResponse,
+  WatchlistSummaryItem,
+  cardClasses,
+} from "@/app/lib/analysis";
 
 async function getWatchlist(): Promise<string[]> {
   const res = await fetch(`${API_BASE}/api/watchlist`, {
@@ -52,11 +59,37 @@ async function getVolatilityScreener(): Promise<VolatilityScreenerResponse> {
   }
 }
 
+function emptyPortfolio(requestedCount: number): PortfolioOptimizeResponse {
+  return {
+    available: false,
+    reason: "insufficient_tickers",
+    tickers_used: [],
+    requested_count: requestedCount,
+    rate_limited: false,
+    max_sharpe_portfolio: null,
+    min_volatility_portfolio: null,
+    random_portfolios: [],
+  };
+}
+
+// Independent from the other two fetches -- a Polygon rate limit or network
+// failure here should never take down the rest of the Dashboard.
+async function getPortfolioOptimization(requestedCount: number): Promise<PortfolioOptimizeResponse> {
+  try {
+    const res = await fetch(`${API_BASE}/api/portfolio/optimize`, { cache: "no-store" });
+    if (!res.ok) return emptyPortfolio(requestedCount);
+    return await res.json();
+  } catch {
+    return emptyPortfolio(requestedCount);
+  }
+}
+
 export default async function DashboardPage() {
   const tickers = await getWatchlist();
-  const [rows, screener] = await Promise.all([
+  const [rows, screener, portfolio] = await Promise.all([
     getWatchlistSummary(tickers),
     getVolatilityScreener(),
+    getPortfolioOptimization(tickers.length),
   ]);
 
   return (
@@ -74,6 +107,18 @@ export default async function DashboardPage() {
         </div>
 
         <VolatilityScreener data={screener} />
+
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight">Optimal Asset Allocation</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Markowitz mean-variance optimization over the watchlist &mdash; the Maximum
+            Sharpe (tangency) and Minimum Volatility portfolios, plotted against a cloud
+            of random long-only allocations.
+          </p>
+          <div className="mt-3">
+            <EfficientFrontier data={portfolio} />
+          </div>
+        </div>
 
         {rows.length > 0 && (
           <>
