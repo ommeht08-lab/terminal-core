@@ -75,6 +75,39 @@ export type AnalyzeResponse = {
   altman_z_score: number | null;
 };
 
+// Matches backend BotPositionsResponse (GET /api/bot/positions). `error` is
+// only set when `configured` is true but the Alpaca request itself failed --
+// missing keys is a normal "not wired up yet" state, not an error.
+export type BotPosition = {
+  ticker: string;
+  quantity: number;
+  current_price: number;
+  unrealized_pl: number;
+  unrealized_plpc: number;
+  market_value: number;
+};
+
+export type BotPositionsResponse = {
+  configured: boolean;
+  error: "rate_limited" | "unavailable" | null;
+  positions: BotPosition[];
+};
+
+// Matches backend BotPnlResponse (GET /api/bot/pnl). Individual bars can have
+// null equity/profit_loss on days the account had no activity yet.
+export type BotEquityPoint = {
+  date: string;
+  equity: number | null;
+  profit_loss: number | null;
+  profit_loss_pct: number | null;
+};
+
+export type BotPnlResponse = {
+  configured: boolean;
+  error: "rate_limited" | "unavailable" | null;
+  equity_curve: BotEquityPoint[];
+};
+
 export const cardClasses =
   "bg-slate-900/40 border border-slate-700/50 backdrop-blur-md rounded-2xl shadow-xl shadow-black/20 hover:bg-slate-900/60 hover:border-slate-600/60 transition-all duration-300";
 

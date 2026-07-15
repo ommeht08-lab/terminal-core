@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from typing import List, Optional
 
+from alpaca_client import get_bot_pnl, get_bot_positions
 from backtester import run_backtest
 from data_engine import PolygonRateLimitError, fetch_batch_quotes, fetch_ohlcv
 from database import ResearchNote, Watchlist, get_db, init_db
@@ -208,6 +209,22 @@ def sector_news(sector: str):
             detail=f"Unknown sector '{sector}'. Expected one of: {', '.join(SECTOR_NEWS_QUERIES)}",
         )
     return get_news(sector=sector)
+
+
+@app.get("/api/bot/positions")
+def bot_positions():
+    """Read-only: current open paper-trading positions from the Java
+    execution engine's Alpaca account. Never places or modifies orders.
+    """
+    return get_bot_positions()
+
+
+@app.get("/api/bot/pnl")
+def bot_pnl():
+    """Read-only: the execution engine's paper-account equity curve over the
+    trailing 30 days.
+    """
+    return get_bot_pnl()
 
 
 @app.get("/api/watchlist")

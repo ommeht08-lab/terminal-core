@@ -72,6 +72,12 @@ export default function Header() {
             >
               Long-Term
             </Link>
+            <Link
+              href="/telemetry"
+              className="text-sm text-slate-400 hover:text-white transition-colors"
+            >
+              Algo Telemetry
+            </Link>
           </nav>
         </div>
 
