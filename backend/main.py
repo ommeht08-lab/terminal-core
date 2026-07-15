@@ -23,6 +23,7 @@ from quant_metrics import (
     get_diagnostics,
     get_fundamental_snapshot,
     get_news,
+    get_valuation_inputs,
 )
 
 app = FastAPI(title="Quant Finance Model API")
@@ -209,6 +210,17 @@ def sector_news(sector: str):
             detail=f"Unknown sector '{sector}'. Expected one of: {', '.join(SECTOR_NEWS_QUERIES)}",
         )
     return get_news(sector=sector)
+
+
+@app.get("/api/valuation/{ticker}")
+def valuation(ticker: str):
+    """Raw DCF inputs for the client-side Interactive Valuation tool
+    (`/ticker/[symbol]`). The actual discounted-cash-flow math (WACC/terminal
+    growth sliders, margin of safety) runs client-side against these four
+    numbers plus the live price -- this endpoint only fetches and validates
+    the real fundamentals, it never computes or returns a valuation itself.
+    """
+    return get_valuation_inputs(ticker.upper())
 
 
 @app.get("/api/bot/positions")

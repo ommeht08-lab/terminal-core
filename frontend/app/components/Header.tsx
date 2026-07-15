@@ -40,7 +40,7 @@ export default function Header() {
     const sanitized = ticker.trim().toUpperCase();
     if (!sanitized) return;
 
-    router.push(`/stock/${sanitized}`);
+    router.push(`/ticker/${sanitized}`);
   }
 
   return (

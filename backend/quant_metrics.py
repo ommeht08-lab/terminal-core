@@ -148,6 +148,52 @@ def get_diagnostics(ticker: str) -> dict:
     }
 
 
+def get_valuation_inputs(ticker: str) -> dict:
+    """Raw DCF inputs for the client-side valuation tool: latest annual free
+    cash flow, total debt, cash & equivalents (all from FMP's real
+    cash-flow-statement/balance-sheet-statement, most-recent-period only --
+    no TTM blending or estimation), shares outstanding (from shares-float's
+    real `outstandingShares` field, not derived from market cap), and the
+    live quote price (FMP `profile`).
+
+    cash-flow-statement/balance-sheet-statement have the same per-ticker
+    restriction as other FMP endpoints on this plan (confirmed empirically:
+    BRK-B 402s on both while shares-float/profile still work for it) -- so
+    `available` is False whenever any of the four DCF inputs is missing,
+    rather than running a DCF on a partial/fabricated set of numbers. The
+    frontend renders `available: False` as a data-unavailable state, never a
+    default/placeholder valuation.
+    """
+    cash_flow = fmp_get("cash-flow-statement", {"symbol": ticker, "limit": 1})
+    balance_sheet = fmp_get("balance-sheet-statement", {"symbol": ticker, "limit": 1})
+    shares_float = fmp_get("shares-float", {"symbol": ticker})
+    profile = fmp_get_first("profile", ticker)
+
+    free_cash_flow = _safe_float(cash_flow[0].get("freeCashFlow")) if cash_flow else None
+    total_debt = _safe_float(balance_sheet[0].get("totalDebt")) if balance_sheet else None
+    cash_and_equivalents = (
+        _safe_float(balance_sheet[0].get("cashAndCashEquivalents")) if balance_sheet else None
+    )
+    shares_outstanding = (
+        _safe_float(shares_float[0].get("outstandingShares")) if shares_float else None
+    )
+    current_price = _safe_float(profile.get("price")) if profile else None
+
+    inputs = {
+        "free_cash_flow": free_cash_flow,
+        "total_debt": total_debt,
+        "cash_and_equivalents": cash_and_equivalents,
+        "shares_outstanding": shares_outstanding,
+        "current_price": current_price,
+    }
+
+    return {
+        "ticker": ticker.upper(),
+        "available": all(v is not None for v in inputs.values()),
+        **inputs,
+    }
+
+
 def _parse_google_news_rss(query: str, limit: int) -> list[dict]:
     """Fallback news source: Google News' public RSS search feed, no API key
     needed. `query` is a pre-built search string (e.g. "AAPL stock" or

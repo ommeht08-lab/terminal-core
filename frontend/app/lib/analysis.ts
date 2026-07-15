@@ -120,6 +120,20 @@ export type BotPnlResponse = {
   equity_curve: BotEquityPoint[];
 };
 
+// Matches backend GET /api/valuation/{ticker}. `available` is False whenever
+// any of the four raw DCF inputs is missing (FMP's per-ticker fundamentals
+// restriction) -- the frontend must never run the DCF model on a partial set
+// of these, since a null defaulted to 0 would silently distort the output.
+export type ValuationInputs = {
+  ticker: string;
+  available: boolean;
+  free_cash_flow: number | null;
+  total_debt: number | null;
+  cash_and_equivalents: number | null;
+  shares_outstanding: number | null;
+  current_price: number | null;
+};
+
 export const cardClasses =
   "bg-slate-900/40 border border-slate-700/50 backdrop-blur-md rounded-2xl shadow-xl shadow-black/20 hover:bg-slate-900/60 hover:border-slate-600/60 transition-all duration-300";
 
