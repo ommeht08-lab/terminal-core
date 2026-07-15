@@ -24,6 +24,7 @@ from quant_metrics import (
     get_fundamental_snapshot,
     get_news,
     get_valuation_inputs,
+    screen_volatility,
 )
 
 app = FastAPI(title="Quant Finance Model API")
@@ -243,6 +244,16 @@ def bot_pnl():
 def get_watchlist(db: Session = Depends(get_db)):
     rows = db.query(Watchlist).order_by(Watchlist.ticker).all()
     return [row.ticker for row in rows]
+
+
+@app.get("/api/screener/volatility")
+def screener_volatility(db: Session = Depends(get_db)):
+    """Dashboard's volatility/mean-reversion screener over the current
+    Watchlist. See screen_volatility() for the Polygon rate-limit handling --
+    an empty watchlist here just means an empty `rows` list, not an error.
+    """
+    tickers = [row.ticker for row in db.query(Watchlist).order_by(Watchlist.ticker).all()]
+    return screen_volatility(tickers)
 
 
 @app.post("/api/watchlist/{ticker}")

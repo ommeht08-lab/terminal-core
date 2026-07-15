@@ -48,16 +48,7 @@ def _polygon_get(path: str, params: Optional[dict] = None) -> dict:
     return response.json()
 
 
-def fetch_ohlcv(ticker: str) -> pd.DataFrame:
-    """Fetch daily OHLCV history for a ticker via Polygon Aggregates (Bars).
-
-    Requests 5 years but the free tier only actually returns ~2 years of bars
-    (verified empirically) -- still comfortably covers the 200-day SMA and RSI/
-    Z-score windows calculate_metrics() needs.
-    """
-    end = date.today()
-    start = end - timedelta(days=5 * 365)
-
+def _fetch_daily_aggregates(ticker: str, start: date, end: date) -> pd.DataFrame:
     data = _polygon_get(
         f"/v2/aggs/ticker/{_to_polygon_ticker(ticker)}/range/1/day/{start.isoformat()}/{end.isoformat()}",
         {"adjusted": "true", "sort": "asc", "limit": 50000},
@@ -72,9 +63,31 @@ def fetch_ohlcv(ticker: str) -> pd.DataFrame:
     df = df.rename(
         columns={"o": "Open", "h": "High", "l": "Low", "c": "Close", "v": "Volume"}
     )
-    df = df.set_index("Date")[["Open", "High", "Low", "Close", "Volume"]].dropna()
+    return df.set_index("Date")[["Open", "High", "Low", "Close", "Volume"]].dropna()
 
-    return df
+
+def fetch_ohlcv(ticker: str) -> pd.DataFrame:
+    """Fetch daily OHLCV history for a ticker via Polygon Aggregates (Bars).
+
+    Requests 5 years but the free tier only actually returns ~2 years of bars
+    (verified empirically) -- still comfortably covers the 200-day SMA and RSI/
+    Z-score windows calculate_metrics() needs.
+    """
+    end = date.today()
+    start = end - timedelta(days=5 * 365)
+    return _fetch_daily_aggregates(ticker, start, end)
+
+
+def fetch_recent_ohlcv(ticker: str, calendar_days: int = 60) -> pd.DataFrame:
+    """Narrower, single-call version of fetch_ohlcv() for callers that only
+    need recent history (e.g. the volatility screener's 30-trading-day
+    window) -- avoids paying for a 5-year fetch just to slice the tail.
+    Default 60 calendar days comfortably clears weekends/holidays to yield
+    30+ trading days.
+    """
+    end = date.today()
+    start = end - timedelta(days=calendar_days)
+    return _fetch_daily_aggregates(ticker, start, end)
 
 
 def _fetch_grouped_day(day: date) -> dict[str, dict]:

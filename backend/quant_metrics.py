@@ -6,6 +6,7 @@ from typing import Optional
 import pandas as pd
 import requests
 
+from data_engine import PolygonRateLimitError, fetch_recent_ohlcv
 from fmp_client import fmp_get, fmp_get_first
 
 GOOGLE_NEWS_RSS_URL = "https://news.google.com/rss/search"
@@ -71,6 +72,81 @@ def calculate_metrics(df: pd.DataFrame) -> pd.DataFrame:
 
 def _safe_float(value):
     return None if pd.isna(value) else float(value)
+
+
+def _screen_one(ticker: str) -> Optional[dict]:
+    """RSI-14, 30-day price standard deviation, and % distance from the
+    20-day SMA for a single ticker, using only the trailing 30 trading days
+    (fetch_recent_ohlcv's ~60-calendar-day window, tailed to exactly 30 rows)
+    -- deliberately not the full multi-year history calculate_metrics() uses
+    elsewhere, since this screener is specifically about recent/short-window
+    mean-reversion behavior. Returns None if fewer than 30 trading days come
+    back (illiquid ticker, gap in Polygon's data) rather than computing a
+    30-day std dev on fewer than 30 days.
+    """
+    df = fetch_recent_ohlcv(ticker)
+    closes = df["Close"].tail(30)
+
+    if len(closes) < 30:
+        return None
+
+    rsi_14 = _safe_float(calculate_rsi(closes, period=14).iloc[-1])
+    sma_20 = _safe_float(closes.rolling(window=20).mean().iloc[-1])
+    std_30 = _safe_float(closes.std())
+    current_price = float(closes.iloc[-1])
+
+    pct_from_sma_20 = None
+    std_devs_from_sma = None
+    if sma_20 is not None and sma_20 != 0:
+        pct_from_sma_20 = (current_price - sma_20) / sma_20 * 100
+    if sma_20 is not None and std_30 not in (None, 0):
+        std_devs_from_sma = (current_price - sma_20) / std_30
+
+    return {
+        "ticker": ticker,
+        "price": current_price,
+        "rsi_14": rsi_14,
+        "std_dev_30": std_30,
+        "pct_from_sma_20": pct_from_sma_20,
+        "std_devs_from_sma": std_devs_from_sma,
+    }
+
+
+def screen_volatility(tickers: list[str]) -> dict:
+    """Mean-reversion screener for the Dashboard: RSI-14, 30-day price
+    standard deviation, and % distance from the 20-day SMA for each watchlist
+    ticker, fetched one Polygon call per ticker (a ~60-calendar-day range,
+    not the full 5-year fetch_ohlcv() history).
+
+    Polygon's free tier hard-caps at 5 requests/minute (confirmed repeatedly
+    elsewhere in this app) -- unworkable to fetch every ticker in a large
+    watchlist in one request. Rather than blocking for minutes or silently
+    truncating the watchlist without saying so, this stops at the first
+    PolygonRateLimitError and returns whatever rows it already computed, with
+    `rate_limited: True` so the frontend can render an honest partial-results
+    state instead of either hanging or claiming full coverage it doesn't have.
+    """
+    rows = []
+    rate_limited = False
+
+    for ticker in tickers:
+        try:
+            row = _screen_one(ticker)
+        except PolygonRateLimitError:
+            rate_limited = True
+            break
+        except (ValueError, requests.RequestException):
+            continue
+
+        if row is not None:
+            rows.append(row)
+
+    return {
+        "rows": rows,
+        "rate_limited": rate_limited,
+        "requested_count": len(tickers),
+        "returned_count": len(rows),
+    }
 
 
 def build_history(metrics_df: pd.DataFrame, days: int = 1260) -> list[dict]:

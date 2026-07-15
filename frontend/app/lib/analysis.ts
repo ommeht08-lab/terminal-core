@@ -134,6 +134,52 @@ export type ValuationInputs = {
   current_price: number | null;
 };
 
+// Matches backend GET /api/screener/volatility. Any of the metric fields can
+// be null if a ticker didn't return quite enough trading-day history to
+// compute a full 30-day window. `rate_limited: true` means Polygon's 5
+// req/min cap was hit mid-screen -- `rows` is a real but partial result, not
+// a full pass over the watchlist, so the frontend must say so rather than
+// presenting it as complete coverage.
+export type ScreenerRow = {
+  ticker: string;
+  price: number;
+  rsi_14: number | null;
+  std_dev_30: number | null;
+  pct_from_sma_20: number | null;
+  std_devs_from_sma: number | null;
+};
+
+export type VolatilityScreenerResponse = {
+  rows: ScreenerRow[];
+  rate_limited: boolean;
+  requested_count: number;
+  returned_count: number;
+};
+
+// Mean-reversion read on a screener row: oversold (RSI < 30 or >2 std devs
+// below the 20-day SMA) reads bullish/green, overbought (RSI > 70 or >2 std
+// devs above) reads bearish/red, everything else is neutral.
+export type ScreenerSignal = "oversold" | "overbought" | "neutral";
+
+export function screenerSignal(row: ScreenerRow): ScreenerSignal {
+  const oversold =
+    (row.rsi_14 !== null && row.rsi_14 < 30) ||
+    (row.std_devs_from_sma !== null && row.std_devs_from_sma < -2);
+  const overbought =
+    (row.rsi_14 !== null && row.rsi_14 > 70) ||
+    (row.std_devs_from_sma !== null && row.std_devs_from_sma > 2);
+
+  if (oversold) return "oversold";
+  if (overbought) return "overbought";
+  return "neutral";
+}
+
+export function screenerRowClasses(signal: ScreenerSignal): string {
+  if (signal === "oversold") return "bg-emerald-500/10 hover:bg-emerald-500/15";
+  if (signal === "overbought") return "bg-rose-500/10 hover:bg-rose-500/15";
+  return "hover:bg-white/[0.03]";
+}
+
 export const cardClasses =
   "bg-slate-900/40 border border-slate-700/50 backdrop-blur-md rounded-2xl shadow-xl shadow-black/20 hover:bg-slate-900/60 hover:border-slate-600/60 transition-all duration-300";
 
