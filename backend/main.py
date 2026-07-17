@@ -30,6 +30,16 @@ from quant_metrics import (
 
 app = FastAPI(title="Quant Finance Model API")
 
+
+@app.get("/")
+def read_root():
+    return {
+        "status": "online",
+        "service": "Prism Quantitative API",
+        "version": "1.0.0"
+    }
+
+
 # Comma-separated list, e.g. "https://terminal-core.vercel.app,http://localhost:3000".
 # Falls back to the local dev frontend if unset or empty (blank/whitespace-only
 # entries are dropped so a stray trailing comma doesn't produce a "" origin).
