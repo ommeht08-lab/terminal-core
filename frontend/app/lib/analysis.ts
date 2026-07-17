@@ -129,6 +129,21 @@ export type AlgoConfig = {
   updated_at: string | null;
 };
 
+// Matches backend GET /api/bot/executions -- trades the Java execution
+// engine has reported via the authenticated POST /api/webhooks/execute
+// webhook. This is this app's only real inbound signal from the engine
+// (unlike AlgoConfig, which the engine may or may not actually poll): a row
+// here means the engine told this app it executed a trade.
+export type ExecutionEntry = {
+  id: number;
+  timestamp: string | null;
+  ticker: string;
+  action: "BUY" | "SELL";
+  quantity: number;
+  price: number;
+  strategy: string;
+};
+
 // Matches backend POST /api/backtest. This is the Telemetry page's own
 // simulation of the Risk Controls parameters against real historical
 // OHLCV -- not a verified replica of the Java execution engine's live

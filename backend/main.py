@@ -1,8 +1,9 @@
 import math
 import os
+import secrets
 from datetime import datetime, timezone
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -12,7 +13,7 @@ from typing import List, Optional
 from alpaca_client import get_bot_pnl, get_bot_positions
 from backtester import run_backtest, run_mean_reversion_backtest
 from data_engine import PolygonRateLimitError, fetch_batch_quotes, fetch_ohlcv
-from database import AlgoConfig, ResearchNote, Watchlist, get_db, init_db
+from database import AlgoConfig, ExecutionLedger, ResearchNote, Watchlist, get_db, init_db
 from portfolio_optimizer import optimize_portfolio
 from sentiment_engine import analyze_sentiment
 from fundamental_metrics import calculate_fundamentals
@@ -64,6 +65,13 @@ def on_startup():
     init_db()
 
 
+# Shared secret the Java execution engine must present (via the X-Bot-Auth
+# header) to POST /api/webhooks/execute. Unset means the webhook is closed
+# to everyone -- fail closed, not open, rather than trusting an absent
+# secret as "no auth required".
+BOT_WEBHOOK_SECRET = os.getenv("BOT_WEBHOOK_SECRET")
+
+
 class NoteBody(BaseModel):
     content: str
 
@@ -77,6 +85,14 @@ class BacktestRequest(BaseModel):
     ticker: str = "AAPL"
     ma_lookback_period: int = Field(20, gt=0, le=500)
     std_dev_multiplier: float = Field(2.0, gt=0, le=10)
+
+
+class ExecutionPayload(BaseModel):
+    ticker: str
+    action: str
+    quantity: float = Field(gt=0)
+    price: float = Field(gt=0)
+    strategy: str = "Mean Reversion"
 
 
 # Single-user app, no auth system -- hardcoded so every note's byline is attached
@@ -343,6 +359,67 @@ def backtest(body: BacktestRequest):
         df, body.ma_lookback_period, body.std_dev_multiplier
     )
     return {"ticker": ticker, **result}
+
+
+def _serialize_execution(entry: ExecutionLedger) -> dict:
+    return {
+        "id": entry.id,
+        "timestamp": entry.timestamp.isoformat() if entry.timestamp else None,
+        "ticker": entry.ticker,
+        "action": entry.action,
+        "quantity": entry.quantity,
+        "price": entry.price,
+        "strategy": entry.strategy,
+    }
+
+
+@app.post("/api/webhooks/execute")
+def webhook_execute(
+    body: ExecutionPayload,
+    x_bot_auth: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """Inbound trade-execution webhook for the Java execution engine. Requires
+    the X-Bot-Auth header to match BOT_WEBHOOK_SECRET via a constant-time
+    comparison (avoids leaking the secret's length/prefix through response
+    timing) -- a missing/unset secret always rejects, it's never treated as
+    "no auth required".
+    """
+    if not BOT_WEBHOOK_SECRET or not x_bot_auth or not secrets.compare_digest(
+        x_bot_auth, BOT_WEBHOOK_SECRET
+    ):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    action = body.action.strip().upper()
+    if action not in ("BUY", "SELL"):
+        raise HTTPException(status_code=422, detail="action must be 'BUY' or 'SELL'")
+
+    entry = ExecutionLedger(
+        timestamp=datetime.now(timezone.utc),
+        ticker=body.ticker.upper(),
+        action=action,
+        quantity=body.quantity,
+        price=body.price,
+        strategy=body.strategy or "Mean Reversion",
+    )
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    return _serialize_execution(entry)
+
+
+@app.get("/api/bot/executions")
+def bot_executions(db: Session = Depends(get_db)):
+    """The 50 most recent trades the execution engine has reported via the
+    webhook above, newest first.
+    """
+    rows = (
+        db.query(ExecutionLedger)
+        .order_by(ExecutionLedger.timestamp.desc())
+        .limit(50)
+        .all()
+    )
+    return [_serialize_execution(row) for row in rows]
 
 
 @app.get("/api/watchlist")

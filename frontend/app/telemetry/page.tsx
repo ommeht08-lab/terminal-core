@@ -19,6 +19,7 @@ import {
   changeColorClass,
 } from "@/app/lib/analysis";
 import BacktestStrategy from "./BacktestStrategy";
+import LiveExecutionLedger from "./LiveExecutionLedger";
 import RiskControls from "./RiskControls";
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
@@ -244,6 +245,8 @@ export default function TelemetryPage() {
         />
 
         <BacktestStrategy maLookback={maLookback} stdDevMultiplier={stdDevMultiplier} />
+
+        <LiveExecutionLedger />
       </div>
     </div>
   );

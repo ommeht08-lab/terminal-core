@@ -76,6 +76,25 @@ class AlgoConfig(Base):
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
+class ExecutionLedger(Base):
+    """A trade record pushed in by the Java execution engine via the
+    authenticated POST /api/webhooks/execute webhook (see main.py). This
+    table is this app's only real inbound channel from the engine -- unlike
+    AlgoConfig (which the engine may or may not poll), a row here means the
+    engine actually told this app it executed a trade.
+    """
+
+    __tablename__ = "execution_ledger"
+
+    id = Column(Integer, primary_key=True)
+    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    ticker = Column(String, nullable=False)
+    action = Column(String, nullable=False)
+    quantity = Column(Float, nullable=False)
+    price = Column(Float, nullable=False)
+    strategy = Column(String, nullable=False, default="Mean Reversion")
+
+
 def init_db():
     Base.metadata.create_all(bind=engine)
     _add_missing_columns("watchlist", {"name": "VARCHAR", "fundamental_score": "FLOAT"})
