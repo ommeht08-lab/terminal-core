@@ -3,7 +3,7 @@ import os
 import secrets
 from datetime import datetime, timezone
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -14,6 +14,7 @@ from alpaca_client import get_bot_pnl, get_bot_positions
 from backtester import run_backtest, run_mean_reversion_backtest
 from data_engine import PolygonRateLimitError, fetch_batch_quotes, fetch_ohlcv
 from database import AlgoConfig, ExecutionLedger, ResearchNote, Watchlist, get_db, init_db
+from options_engine import price_options
 from portfolio_optimizer import optimize_portfolio
 from sentiment_engine import analyze_sentiment
 from fundamental_metrics import calculate_fundamentals
@@ -271,6 +272,20 @@ def sentiment(ticker: str):
     no news came back from either source, not an error.
     """
     return analyze_sentiment(ticker.upper())
+
+
+@app.get("/api/options/pricing")
+def options_pricing(
+    S: float = Query(..., gt=0, description="Spot price"),
+    K: float = Query(..., gt=0, description="Strike price"),
+    T: float = Query(..., gt=0, le=30, description="Time to maturity, in years"),
+    r: float = Query(0.042, ge=0, le=1, description="Risk-free rate, as a decimal"),
+    sigma: float = Query(..., gt=0, le=5, description="Implied volatility, as a decimal"),
+):
+    """Black-Scholes theoretical call/put prices + Greeks. Pure math, no
+    external data fetch -- safe to call on every slider movement.
+    """
+    return price_options(spot=S, strike=K, time_years=T, rate=r, volatility=sigma)
 
 
 @app.get("/api/bot/positions")

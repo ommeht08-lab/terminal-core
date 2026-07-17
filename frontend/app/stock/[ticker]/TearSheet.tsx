@@ -16,6 +16,7 @@ import ExportButton from "@/app/components/ExportButton";
 import BacktestResults from "./BacktestResults";
 import FinancialDiagnostics from "./FinancialDiagnostics";
 import NewsFeed from "./NewsFeed";
+import OptionsPricer from "./OptionsPricer";
 import PriceChart from "./PriceChart";
 import SentimentAnalysis from "./SentimentAnalysis";
 import ValuationTool from "./ValuationTool";
@@ -212,6 +213,8 @@ export default function TearSheet({
                 </p>
               </div>
             )}
+
+            <OptionsPricer spotPrice={data.price} isExporting={isExporting} />
           </div>
         </div>
       </div>

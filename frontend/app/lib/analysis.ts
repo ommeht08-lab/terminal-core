@@ -219,6 +219,33 @@ export type SentimentResponse = {
   top_negative: SentimentArticle[];
 };
 
+// Matches backend GET /api/options/pricing -- pure Black-Scholes math, no
+// external data fetch, so (unlike everything Polygon/FMP/Alpaca-backed in
+// this app) there's no rate-limit or partial-availability state to model
+// here. theta is per calendar day, vega/rho are per 1% change in
+// volatility/rate -- standard trading-desk conventions, not the raw
+// per-year/per-unit derivatives.
+export type OptionGreeks = {
+  price: number;
+  delta: number;
+  gamma: number;
+  theta: number;
+  vega: number;
+  rho: number;
+};
+
+export type OptionsPricingResponse = {
+  call: OptionGreeks;
+  put: OptionGreeks;
+  inputs: {
+    spot: number;
+    strike: number;
+    time_years: number;
+    rate: number;
+    volatility: number;
+  };
+};
+
 // Matches backend GET /api/valuation/{ticker}. `available` is False whenever
 // any of the four raw DCF inputs is missing (FMP's per-ticker fundamentals
 // restriction) -- the frontend must never run the DCF model on a partial set
