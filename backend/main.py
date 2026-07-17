@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 
 from alpaca_client import get_bot_pnl, get_bot_positions
+from alpaca_engine import BrokerError, execute_market_order
 from backtester import run_backtest, run_mean_reversion_backtest
 from data_engine import PolygonRateLimitError, fetch_batch_quotes, fetch_ohlcv
 from database import AlgoConfig, ExecutionLedger, ResearchNote, Watchlist, get_db, init_db
@@ -94,6 +95,12 @@ class ExecutionPayload(BaseModel):
     quantity: float = Field(gt=0)
     price: float = Field(gt=0)
     strategy: str = "Mean Reversion"
+
+
+class TradeRequest(BaseModel):
+    ticker: str
+    action: str
+    quantity: float = Field(gt=0)
 
 
 # Single-user app, no auth system -- hardcoded so every note's byline is attached
@@ -435,6 +442,39 @@ def bot_executions(db: Session = Depends(get_db)):
         .all()
     )
     return [_serialize_execution(row) for row in rows]
+
+
+@app.post("/api/broker/trade")
+def broker_trade(body: TradeRequest, db: Session = Depends(get_db)):
+    """Places a real market order against the configured Alpaca account
+    (paper by default) and, on success, writes it into execution_ledger
+    with strategy="Manual Override" so it appears in the Live Execution
+    Ledger alongside trades the Java engine reports via the webhook.
+    Alpaca failures (bad ticker, insufficient buying power, market closed
+    for this order type, etc.) come back as a clean 400, not a 500.
+    """
+    action = body.action.strip().lower()
+    if action not in ("buy", "sell"):
+        raise HTTPException(status_code=422, detail="action must be 'buy' or 'sell'")
+
+    try:
+        order = execute_market_order(ticker=body.ticker, qty=body.quantity, side=action)
+    except BrokerError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    entry = ExecutionLedger(
+        timestamp=datetime.now(timezone.utc),
+        ticker=order["ticker"],
+        action=action.upper(),
+        quantity=order["quantity"],
+        price=order["price"],
+        strategy="Manual Override",
+    )
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+
+    return {"order": order, "ledger_entry": _serialize_execution(entry)}
 
 
 @app.get("/api/watchlist")

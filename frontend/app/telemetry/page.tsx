@@ -20,6 +20,7 @@ import {
 } from "@/app/lib/analysis";
 import BacktestStrategy from "./BacktestStrategy";
 import LiveExecutionLedger from "./LiveExecutionLedger";
+import ManualTradeTerminal from "./ManualTradeTerminal";
 import RiskControls from "./RiskControls";
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
@@ -245,6 +246,8 @@ export default function TelemetryPage() {
         />
 
         <BacktestStrategy maLookback={maLookback} stdDevMultiplier={stdDevMultiplier} />
+
+        <ManualTradeTerminal />
 
         <LiveExecutionLedger />
       </div>

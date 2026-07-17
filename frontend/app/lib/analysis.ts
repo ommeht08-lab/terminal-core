@@ -144,6 +144,24 @@ export type ExecutionEntry = {
   strategy: string;
 };
 
+// Matches backend POST /api/broker/trade -- places a real market order
+// against the connected Alpaca account (paper by default) and, on success,
+// writes it into execution_ledger with strategy "Manual Override".
+export type BrokerOrder = {
+  order_id: string;
+  ticker: string;
+  side: "buy" | "sell";
+  quantity: number;
+  price: number;
+  status: string;
+  submitted_at: string | null;
+};
+
+export type BrokerTradeResponse = {
+  order: BrokerOrder;
+  ledger_entry: ExecutionEntry;
+};
+
 // Matches backend POST /api/backtest. This is the Telemetry page's own
 // simulation of the Risk Controls parameters against real historical
 // OHLCV -- not a verified replica of the Java execution engine's live
