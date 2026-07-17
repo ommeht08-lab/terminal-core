@@ -4,6 +4,7 @@ import { useState } from "react";
 import generatePDF from "react-to-pdf";
 import {
   AnalyzeResponse,
+  SentimentResponse,
   ValuationInputs,
   cardClasses,
   cardClassesFor,
@@ -16,6 +17,7 @@ import BacktestResults from "./BacktestResults";
 import FinancialDiagnostics from "./FinancialDiagnostics";
 import NewsFeed from "./NewsFeed";
 import PriceChart from "./PriceChart";
+import SentimentAnalysis from "./SentimentAnalysis";
 import ValuationTool from "./ValuationTool";
 import WatchlistButton from "./WatchlistButton";
 
@@ -55,9 +57,11 @@ function formatRatio(value: number | null): string {
 export default function TearSheet({
   data,
   valuation,
+  sentiment,
 }: {
   data: AnalyzeResponse;
   valuation: ValuationInputs;
+  sentiment: SentimentResponse;
 }) {
   const [isExporting, setIsExporting] = useState(false);
 
@@ -180,6 +184,8 @@ export default function TearSheet({
             </div>
 
             <BacktestResults backtest={data.backtest} isExporting={isExporting} />
+
+            <SentimentAnalysis sentiment={sentiment} isExporting={isExporting} />
 
             <NewsFeed news={data.news} isExporting={isExporting} />
           </div>

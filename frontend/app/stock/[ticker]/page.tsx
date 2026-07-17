@@ -1,4 +1,4 @@
-import { API_BASE, AnalyzeResponse, ValuationInputs } from "@/app/lib/analysis";
+import { API_BASE, AnalyzeResponse, SentimentResponse, ValuationInputs } from "@/app/lib/analysis";
 import TearSheet from "./TearSheet";
 
 async function getAnalysis(ticker: string): Promise<AnalyzeResponse | null> {
@@ -38,13 +38,41 @@ async function getValuation(ticker: string): Promise<ValuationInputs> {
   }
 }
 
+function unavailableSentiment(ticker: string): SentimentResponse {
+  return {
+    ticker,
+    available: false,
+    compound_score: null,
+    classification: null,
+    article_count: 0,
+    top_positive: [],
+    top_negative: [],
+  };
+}
+
+// Also independently-degrading -- a sentiment fetch failure never takes
+// down the rest of the tear sheet.
+async function getSentiment(ticker: string): Promise<SentimentResponse> {
+  try {
+    const res = await fetch(`${API_BASE}/api/sentiment/${ticker}`, { cache: "no-store" });
+    if (!res.ok) return unavailableSentiment(ticker);
+    return await res.json();
+  } catch {
+    return unavailableSentiment(ticker);
+  }
+}
+
 export default async function StockPage({
   params,
 }: {
   params: Promise<{ ticker: string }>;
 }) {
   const { ticker } = await params;
-  const [data, valuation] = await Promise.all([getAnalysis(ticker), getValuation(ticker)]);
+  const [data, valuation, sentiment] = await Promise.all([
+    getAnalysis(ticker),
+    getValuation(ticker),
+    getSentiment(ticker),
+  ]);
 
   if (!data) {
     return (
@@ -58,5 +86,5 @@ export default async function StockPage({
     );
   }
 
-  return <TearSheet data={data} valuation={valuation} />;
+  return <TearSheet data={data} valuation={valuation} sentiment={sentiment} />;
 }

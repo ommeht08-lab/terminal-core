@@ -183,6 +183,27 @@ export type PortfolioOptimizeResponse = {
   random_portfolios: RandomPortfolioPoint[];
 };
 
+// Matches backend GET /api/sentiment/{ticker}. Headline text only (no full
+// article body is available from either FMP or the Google News RSS
+// fallback get_news() uses) -- `compound_score` is VADER's per-headline
+// score, `-1.0` to `1.0`. `available: false` means no news came back for
+// this ticker, not an error.
+export type SentimentArticle = NewsArticle & {
+  compound_score: number;
+};
+
+export type SentimentClassification = "Bullish" | "Bearish" | "Neutral";
+
+export type SentimentResponse = {
+  ticker: string;
+  available: boolean;
+  compound_score: number | null;
+  classification: SentimentClassification | null;
+  article_count: number;
+  top_positive: SentimentArticle[];
+  top_negative: SentimentArticle[];
+};
+
 // Matches backend GET /api/valuation/{ticker}. `available` is False whenever
 // any of the four raw DCF inputs is missing (FMP's per-ticker fundamentals
 // restriction) -- the frontend must never run the DCF model on a partial set

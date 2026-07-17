@@ -14,6 +14,7 @@ from backtester import run_backtest, run_mean_reversion_backtest
 from data_engine import PolygonRateLimitError, fetch_batch_quotes, fetch_ohlcv
 from database import AlgoConfig, ResearchNote, Watchlist, get_db, init_db
 from portfolio_optimizer import optimize_portfolio
+from sentiment_engine import analyze_sentiment
 from fundamental_metrics import calculate_fundamentals
 from hybrid_engine import generate_hybrid_signal
 from quant_metrics import (
@@ -237,13 +238,23 @@ def sector_news(sector: str):
 
 @app.get("/api/valuation/{ticker}")
 def valuation(ticker: str):
-    """Raw DCF inputs for the client-side Interactive Valuation tool
-    (`/ticker/[symbol]`). The actual discounted-cash-flow math (WACC/terminal
-    growth sliders, margin of safety) runs client-side against these four
-    numbers plus the live price -- this endpoint only fetches and validates
-    the real fundamentals, it never computes or returns a valuation itself.
+    """Raw DCF inputs for the client-side Interactive Valuation tool,
+    integrated into the stock tear sheet (`/stock/[ticker]`). The actual
+    discounted-cash-flow math (WACC/terminal growth sliders, margin of
+    safety) runs client-side against these four numbers plus the live price
+    -- this endpoint only fetches and validates the real fundamentals, it
+    never computes or returns a valuation itself.
     """
     return get_valuation_inputs(ticker.upper())
+
+
+@app.get("/api/sentiment/{ticker}")
+def sentiment(ticker: str):
+    """VADER sentiment over the ticker's recent news headlines (FMP,
+    Google-News-RSS fallback -- see get_news()). `available: False` means
+    no news came back from either source, not an error.
+    """
+    return analyze_sentiment(ticker.upper())
 
 
 @app.get("/api/bot/positions")
